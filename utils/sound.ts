@@ -24,14 +24,36 @@ export class SoundEngine {
 
   resume() {
     if (this.ctx && this.ctx.state === 'suspended') {
-      this.ctx.resume();
+      this.ctx.resume().then(() => {
+          console.log("AudioContext resumed successfully");
+      }).catch(e => console.error("Failed to resume AudioContext:", e));
     }
+  }
+
+  // --- SPEECH SYNTHESIS ---
+  speak(text: string, pitch: number = 1, rate: number = 1) {
+      if (!window.speechSynthesis) return;
+      // Cancel previous utterances
+      window.speechSynthesis.cancel();
+      
+      const utterance = new SpeechSynthesisUtterance(text);
+      utterance.pitch = pitch;
+      utterance.rate = rate;
+      utterance.volume = 1.0;
+      
+      // Try to find a good english voice
+      const voices = window.speechSynthesis.getVoices();
+      const preferredVoice = voices.find(v => v.lang.startsWith('en') && v.name.includes('Google')) || voices.find(v => v.lang.startsWith('en'));
+      if (preferredVoice) utterance.voice = preferredVoice;
+
+      window.speechSynthesis.speak(utterance);
   }
 
   // --- SYNTHESIS HELPERS ---
 
   private playTone(freq: number, type: OscillatorType, duration: number, startTime: number = 0, volume: number = 0.1) {
     if (!this.ctx || !this.masterGain) return;
+    // console.log(`Playing tone: ${freq}Hz`);
     const t = this.ctx.currentTime + startTime;
     
     const osc = this.ctx.createOscillator();
@@ -52,6 +74,8 @@ export class SoundEngine {
     osc.stop(t + duration);
   }
 
+  // ... (createNoiseBuffer and playNoise remain the same) ...
+  
   private createNoiseBuffer() {
     if (!this.ctx) return null;
     const bufferSize = this.ctx.sampleRate * 2; // 2 seconds
@@ -92,12 +116,10 @@ export class SoundEngine {
   // --- GAME SFX ---
 
   playSwing() {
-      // White noise sweep (Whoosh)
       this.playNoise(0.15, 1200, 0.1);
   }
 
   playDodge() {
-      // Quick pitch bend
       if (!this.ctx || !this.masterGain) return;
       const t = this.ctx.currentTime;
       const osc = this.ctx.createOscillator();
@@ -117,25 +139,21 @@ export class SoundEngine {
 
   playHit(type: 'HEAD' | 'BODY' | 'BLOCK') {
       if (type === 'BLOCK') {
-          // Short metallic click
           this.playTone(150, 'square', 0.05, 0, 0.1);
           this.playNoise(0.05, 800, 0.05);
           return;
       }
 
       if (type === 'HEAD') {
-          // High pitch smack + noise
           this.playTone(200, 'sawtooth', 0.1, 0, 0.15);
-          this.playNoise(0.15, 3000, 0.2); // Snap noise
+          this.playNoise(0.15, 3000, 0.2); 
       } else {
-          // Low pitch thud + noise
           this.playTone(60, 'square', 0.2, 0, 0.2);
-          this.playNoise(0.2, 500, 0.25); // Thud noise
+          this.playNoise(0.2, 500, 0.25); 
       }
   }
 
   playGrunt(isOpponent: boolean) {
-      // Synthesis of a voice-like sound using filtered sawtooth
       if (!this.ctx || !this.masterGain) return;
       
       const pitch = isOpponent ? 80 : 150;
@@ -158,7 +176,6 @@ export class SoundEngine {
   }
 
   playCrowd(intensity: 'LOW' | 'HIGH') {
-      // Long noise burst with bandpass
       if (!this.ctx || !this.masterGain) return;
       const buffer = this.createNoiseBuffer();
       if (!buffer) return;
@@ -189,36 +206,45 @@ export class SoundEngine {
   }
 
   playReady() {
-      if (!this.ctx) return;
-      // "READY..." (Two rising tones)
+      this.speak("Ready", 1.2, 1.2);
       this.playTone(300, 'square', 0.1, 0);
       this.playTone(400, 'square', 0.3, 0.2);
   }
 
   playFight() {
-      if (!this.ctx) return;
-      // "FIGHT!" (Crash / High Chord)
+      this.speak("Fight!", 0.8, 1.5);
       this.playTone(600, 'sawtooth', 0.1, 0);
       this.playTone(800, 'square', 0.4, 0);
-      this.playNoise(0.5, 2000, 0.2); // Crash
+      this.playNoise(0.5, 2000, 0.2); 
   }
 
   playStart() {
       // 8-bit "Round Start" Jingle
       const t = this.ctx?.currentTime || 0;
-      this.playTone(440, 'square', 0.1, t);       // A4
-      this.playTone(554, 'square', 0.1, t + 0.1); // C#5
-      this.playTone(659, 'square', 0.1, t + 0.2); // E5
-      this.playTone(880, 'square', 0.4, t + 0.3); // A5
+      this.playTone(440, 'square', 0.1, t);       
+      this.playTone(554, 'square', 0.1, t + 0.1); 
+      this.playTone(659, 'square', 0.1, t + 0.2); 
+      this.playTone(880, 'square', 0.4, t + 0.3); 
   }
 
   playEntrance(characterId: string) {
       if (!this.ctx) return;
       const t = this.ctx.currentTime; // We don't actually use this var in playTone since it adds to current time internally, but logic below assumes offset from NOW.
-      // Correction: playTone adds `startTime` to `this.ctx.currentTime`. So passing 0 plays now.
-
-      // 1. Announcer "Voice" (Low rumble)
-      this.playNoise(1.5, 300, 0.15, 0); 
+      
+      // 1. Announcer "Voice"
+      let name = "Opponent";
+      switch(characterId) {
+          case 'aint_man': name = "Aint Man"; break;
+          case 'medi_jinx': name = "Medi Jinx"; break;
+          case 'dj_tito': name = "D J Tito"; break;
+          case 'mr_yankee': name = "Mr Yankee"; break;
+          case 'maga_man': name = "Maga Man"; break;
+      }
+      
+      // "Fighting out of the red corner... [NAME]!"
+      setTimeout(() => {
+          this.speak(`Fighting out of the red corner... ${name}!`, 0.9, 1.1);
+      }, 500);
       
       // 2. Character Theme
       switch (characterId) {
@@ -260,6 +286,7 @@ export class SoundEngine {
   }
 
   playKO() {
+      this.speak("Knockout!", 0.7, 1.0);
       // 8-bit "Victory" Jingle (Arpeggio)
       const now = 0;
       const notes = [
