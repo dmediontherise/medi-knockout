@@ -103,36 +103,23 @@ const Player: React.FC<PlayerProps> = ({ state }) => {
 
   return (
     <div className={`relative w-[400px] h-[500px] transition-transform duration-100 ease-out origin-bottom ${containerTransform}`}>
-      <svg viewBox="0 -160 150 360" className={`w-full h-full fill-none ${bodyStroke} stroke-2 drop-shadow-[0_0_10px_rgba(0,255,0,0.3)]`}>
+      <svg viewBox="0 -160 150 360" className={`w-full h-full fill-none ${bodyStroke} stroke-2 drop-shadow-[0_0_10px_rgba(0,255,0,0.3)] overflow-visible`}>
         
-        {/* -- Wireframe Body -- */}
-        
-        {/* Head */}
-        <g>
-            <circle cx={headPos.cx} cy={headPos.cy} r="18" className="fill-slate-900/80" />
-            {/* Grid lines on head to show rotation */}
-            <path d={`M${headPos.cx-18} ${headPos.cy} Q${headPos.cx} ${headPos.cy+5} ${headPos.cx+18} ${headPos.cy}`} strokeOpacity="0.5" />
-            <path d={`M${headPos.cx} ${headPos.cy-18} Q${headPos.cx+torsoTwist/2} ${headPos.cy} ${headPos.cx} ${headPos.cy+18}`} strokeOpacity="0.5" />
-            
-            {/* Player Impact Starburst */}
-            {isHit && (
-                 <g transform={`translate(${headPos.cx}, ${headPos.cy})`}>
-                     <path 
-                        d="M0 -30 L10 -10 L30 -15 L15 0 L25 20 L0 10 L-25 20 L-15 0 L-30 -15 L-10 -10 Z" 
-                        fill="#FEF08A" 
-                        stroke="#EF4444" 
-                        strokeWidth="2" 
-                        className="animate-burst"
-                     />
-                 </g>
-            )}
-        </g>
-
-        {/* Torso */}
-        {/* Trapezoid shape that twists */}
-        <path d={`M${L_SHOULDER.x} ${L_SHOULDER.y} L${R_SHOULDER.x} ${R_SHOULDER.y} L${100 - torsoTwist} 180 L${50 - torsoTwist} 180 Z`} className="fill-slate-900/80" />
-        {/* Spine */}
-        <path d={`M${75 + torsoTwist} 70 L${75 - torsoTwist} 180`} strokeDasharray="3 3" strokeOpacity="0.5" />
+        {/* -- Character Sprite -- */}
+        <image 
+             href="assets/player_sprite.png" 
+             x="-50" 
+             y="-180" 
+             width="250" 
+             height="400" 
+             preserveAspectRatio="xMidYMid meet"
+             style={{
+                 transformOrigin: '75px 100px',
+                 transform: `rotate(${torsoTwist * -1}deg) ${isHit ? 'scale(0.95)' : 'scale(1)'}`,
+                 filter: isHit ? 'brightness(1.5) sepia(1) hue-rotate(-50deg)' : 'none',
+                 transition: 'all 0.1s ease-out'
+             }}
+        />
 
         {/* -- Arms (Calculated Paths) -- */}
         {/* Left Arm: Shoulder -> Elbow -> Hand */}
