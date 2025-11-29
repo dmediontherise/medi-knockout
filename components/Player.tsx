@@ -38,8 +38,8 @@ const Player: React.FC<PlayerProps> = ({ state }) => {
       twist = 5;
     }
     else if (state === PlayerAction.PUNCH_LEFT_BODY) {
-      lh = { x: 80, y: -70 }; // AIM MID (Chest/Stomach) - Raised
-      le = { x: 25, y: 10 };
+      lh = { x: 80, y: 0 }; // AIM MID (Chest/Stomach) - Lowered from -70
+      le = { x: 25, y: 60 }; // Elbow tucked lower
       twist = 8;
     }
     else if (state === PlayerAction.PUNCH_RIGHT_HEAD) {
@@ -48,8 +48,8 @@ const Player: React.FC<PlayerProps> = ({ state }) => {
       twist = -5;
     }
     else if (state === PlayerAction.PUNCH_RIGHT_BODY) {
-      rh = { x: 70, y: -70 }; // AIM MID (Chest/Stomach) - Raised
-      re = { x: 125, y: 10 };
+      rh = { x: 70, y: 0 }; // AIM MID (Chest/Stomach) - Lowered from -70
+      re = { x: 125, y: 60 }; // Elbow tucked lower
       twist = -8;
     }
     else if (state === PlayerAction.DODGE_LEFT) {
