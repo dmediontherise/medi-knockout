@@ -24,15 +24,26 @@ export class SoundEngine {
 
   resume() {
     if (this.ctx) {
-      if (this.ctx.state === 'suspended') {
-        this.ctx.resume();
+      const state = this.ctx.state;
+      console.log(`AudioContext state before resume: ${state}`);
+      
+      if (state === 'suspended' || state === 'interrupted') {
+        this.ctx.resume().then(() => {
+            console.log(`AudioContext state after resume: ${this.ctx?.state}`);
+        });
       }
-      // Play silent buffer to warm up engine (iOS fix)
-      const buffer = this.ctx.createBuffer(1, 1, 22050);
-      const source = this.ctx.createBufferSource();
-      source.buffer = buffer;
-      source.connect(this.ctx.destination);
-      source.start(0);
+      
+      // iOS Unlock: Play a short silent tone
+      const osc = this.ctx.createOscillator();
+      const gain = this.ctx.createGain();
+      osc.type = 'sawtooth';
+      osc.frequency.value = 440; // Audible freq just in case, but silenced
+      gain.gain.value = 0; // Silent
+      
+      osc.connect(gain);
+      gain.connect(this.ctx.destination);
+      osc.start(0);
+      osc.stop(0.001); // Stop immediately
     }
   }
 

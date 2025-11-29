@@ -189,7 +189,11 @@ const App: React.FC = () => {
                 </div>
             </div>
             <button 
-                onClick={() => resetGame(false)}
+                onClick={() => {
+                    soundEngine.init(); // Just in case
+                    soundEngine.resume();
+                    resetGame(false);
+                }}
                 className="flex items-center gap-3 px-8 py-4 bg-green-600 hover:bg-green-500 text-white font-retro text-lg rounded shadow-[0_0_25px_rgba(34,197,94,0.6)] transition-all transform hover:scale-110 active:scale-95 mt-4"
             >
                 <Play size={20} /> ENTER RING
