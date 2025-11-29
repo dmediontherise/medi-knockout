@@ -27,10 +27,11 @@ const App: React.FC = () => {
 
   // Ensure AudioContext is unlocked on first interaction
   React.useEffect(() => {
-      const unlockAudio = () => {
-          soundEngine.init();
-          soundEngine.resume();
-          // Try to play menu theme if we are in menu
+      const unlockAudio = async () => { // Made async
+          if (!soundEngine.initialized) {
+            soundEngine.init();
+            await soundEngine.resume(); // Await the resume
+          }
           if (gameState === GameState.MENU) {
              soundEngine.playMenuTheme();
           }

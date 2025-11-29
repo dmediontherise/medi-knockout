@@ -4,6 +4,9 @@ export class SoundEngine {
   private masterGain: GainNode | null = null;
   private initialized: boolean = false;
 
+  private menuThemeOscillator: OscillatorNode | null = null;
+  private menuThemeGain: GainNode | null = null;
+
   init() {
     if (this.initialized) return;
     
@@ -15,35 +18,39 @@ export class SoundEngine {
     this.masterGain.gain.value = 0.8; // Louder
     this.masterGain.connect(this.ctx.destination);
     
+    // It's possible for ctx to be suspended even after creation on iOS
     if (this.ctx.state === 'suspended') {
-        this.ctx.resume();
+        this.ctx.resume().then(() => console.log("AudioContext auto-resumed during init."));
     }
 
     this.initialized = true;
   }
 
-  resume() {
+  async resume() { // Made async
     if (this.ctx) {
       const state = this.ctx.state;
       console.log(`AudioContext state before resume: ${state}`);
       
       if (state === 'suspended' || state === 'interrupted') {
-        this.ctx.resume().then(() => {
-            console.log(`AudioContext state after resume: ${this.ctx?.state}`);
-        });
+        try {
+          await this.ctx.resume(); // Await the resume promise
+          console.log(`AudioContext state after manual resume: ${this.ctx?.state}`);
+        } catch (e) {
+          console.error("Failed to resume AudioContext:", e);
+        }
       }
       
-      // iOS Unlock: Play a short silent tone
+      // iOS Unlock: Play a short silent oscillator to force audio engine activation
       const osc = this.ctx.createOscillator();
       const gain = this.ctx.createGain();
       osc.type = 'sawtooth';
-      osc.frequency.value = 440; // Audible freq just in case, but silenced
+      osc.frequency.value = 440; 
       gain.gain.value = 0; // Silent
       
       osc.connect(gain);
       gain.connect(this.ctx.destination);
       osc.start(0);
-      osc.stop(0.001); // Stop immediately
+      osc.stop(this.ctx.currentTime + 0.001); // Stop immediately after current time
     }
   }
 
@@ -325,25 +332,52 @@ export class SoundEngine {
       }, notes.length * 80);
   }
 
-  playMenuTheme() {
-      if (!this.ctx) return;
-      // Simple Fun Loop (approx 4 seconds)
-      // We'll just play a sequence once when called, App loop can re-trigger or we make it long.
-      // For CLI, we'll just play a cheerful phrase.
-      const t = this.ctx.currentTime;
-      const speed = 0.15;
-      
-      // "Fun" Melody
-      const notes = [
-          523.25, 523.25, 659.25, 783.99, // C C E G
-          880.00, 783.99, 659.25, 523.25, // A G E C
-          587.33, 587.33, 698.46, 880.00, // D D F A
-          783.99, 659.25, 587.33, 493.88  // G E D B
-      ];
+  stopMenuTheme() {
+      if (this.menuThemeOscillator) {
+          this.menuThemeOscillator.stop();
+          this.menuThemeOscillator.disconnect();
+          this.menuThemeGain?.disconnect();
+          this.menuThemeOscillator = null;
+          this.menuThemeGain = null;
+      }
+  }
 
-      notes.forEach((freq, i) => {
-          this.playTone(freq, 'triangle', 0.1, i * speed, 0.05);
+  playMenuTheme() {
+      if (!this.ctx || !this.masterGain) return;
+      if (this.menuThemeOscillator) this.stopMenuTheme(); // Stop if already playing
+
+      const sequence = [
+          { freq: 523.25, duration: 0.15 }, { freq: 659.25, duration: 0.15 }, // C5 E5
+          { freq: 783.99, duration: 0.2 }, { freq: 1046.50, duration: 0.3 }, // G5 C6
+          { freq: 880.00, duration: 0.2 }, { freq: 783.99, duration: 0.2 }, // A5 G5
+          { freq: 659.25, duration: 0.2 }, { freq: 523.25, duration: 0.4 }  // E5 C5
+      ];
+      const totalLoopDuration = 2.5; // Roughly the length of the sequence
+
+      this.menuThemeOscillator = this.ctx.createOscillator();
+      this.menuThemeGain = this.ctx.createGain();
+
+      this.menuThemeOscillator.type = 'triangle';
+      this.menuThemeGain.gain.value = 0.08; // Background music volume
+
+      this.menuThemeOscillator.connect(this.menuThemeGain);
+      this.menuThemeGain.connect(this.masterGain);
+
+      let currentTime = this.ctx.currentTime;
+      sequence.forEach(note => {
+          this.menuThemeOscillator?.frequency.setValueAtTime(note.freq, currentTime);
+          currentTime += note.duration;
       });
+
+      this.menuThemeOscillator.start(this.ctx.currentTime);
+      this.menuThemeOscillator.stop(currentTime);
+
+      // Loop the theme
+      this.menuThemeOscillator.onended = () => {
+          if (this.ctx?.state === 'running' && this.menuThemeOscillator) { // Only loop if context is still running and not explicitly stopped
+              this.playMenuTheme(); // Re-trigger the theme
+          }
+      };
   }
 }
 

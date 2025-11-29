@@ -65,6 +65,7 @@ export const useGameLoop = () => {
     // Initialize sound if not already
     soundEngine.init();
     soundEngine.resume();
+    soundEngine.stopMenuTheme(); // Stop menu music when starting game
     
     // Roster Progression Logic
     let nextIndex = opponentIndex;
