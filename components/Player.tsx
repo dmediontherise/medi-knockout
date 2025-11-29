@@ -107,7 +107,7 @@ const Player: React.FC<PlayerProps> = ({ state }) => {
         
         {/* -- Character Sprite -- */}
         <image 
-             href="assets/player_sprite.png" 
+             href="/medi-knockout/assets/player_sprite.png" 
              x="-50" 
              y="-180" 
              width="250" 
