@@ -11,10 +11,10 @@ export const MAX_PLAYER_COMBO = 5; // Max hits before AI forces a break
 
 // Timing in milliseconds
 export const ACTION_DURATION = {
-  PUNCH: 150, 
-  DODGE: 300,
+  PUNCH: 120, 
+  DODGE: 250,
   BLOCK: 150, 
-  HIT: 200,
+  HIT: 120,
   STUNNED: 1500,
   KO: 3000, 
 };
@@ -27,8 +27,8 @@ export const OPPONENT_MOVES = {
 };
 
 export const AI_SETTINGS = {
-  RECOVERY_BASE: 500, // Reduced from 1000 for more aggression
-  COMBO_INTERVAL: 100, // Faster chain attacks
+  RECOVERY_BASE: 400, // Reduced from 1000 for more aggression
+  COMBO_INTERVAL: 80, // Faster chain attacks
   REFLEX_BLOCK_CHANCE: 0.6, // Higher chance to block spam
 };
 
