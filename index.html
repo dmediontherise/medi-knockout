@@ -26,35 +26,6 @@
       .font-retro {
         font-family: 'Press Start 2P', cursive;
       }
-      /* CRT Scanline Effect */
-      .scanlines {
-        background: linear-gradient(
-          to bottom,
-          rgba(255,255,255,0),
-          rgba(255,255,255,0) 50%,
-          rgba(0,0,0,0.2) 50%,
-          rgba(0,0,0,0.2)
-        );
-        background-size: 100% 4px;
-        position: fixed;
-        top: 0; left: 0; right: 0; bottom: 0;
-        pointer-events: none;
-        z-index: 50;
-      }
-      .crt-flicker {
-        animation: flicker 0.15s infinite;
-        opacity: 0.05;
-        position: fixed;
-        top: 0; left: 0; right: 0; bottom: 0;
-        background: white;
-        pointer-events: none;
-        z-index: 51;
-      }
-      @keyframes flicker {
-        0% { opacity: 0.02; }
-        50% { opacity: 0.05; }
-        100% { opacity: 0.02; }
-      }
       
       /* Smooth SVG transitions for fluid wireframe animation */
       path, circle, line, rect, g {
@@ -111,7 +82,7 @@
         transform-origin: center;
       }
     </style>
-  <script type="module" crossorigin src="/medi-knockout/assets/index-DqQry3zk.js"></script>
+  <script type="module" crossorigin src="/medi-knockout/assets/index-0KkXF2ws.js"></script>
 </head>
   <body>
     <div id="root"></div>
