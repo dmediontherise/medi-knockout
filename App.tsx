@@ -30,6 +30,10 @@ const App: React.FC = () => {
       const unlockAudio = () => {
           soundEngine.init();
           soundEngine.resume();
+          // Try to play menu theme if we are in menu
+          if (gameState === GameState.MENU) {
+             soundEngine.playMenuTheme();
+          }
           window.removeEventListener('click', unlockAudio);
           window.removeEventListener('touchstart', unlockAudio);
           window.removeEventListener('keydown', unlockAudio);
@@ -42,7 +46,7 @@ const App: React.FC = () => {
           window.removeEventListener('touchstart', unlockAudio);
           window.removeEventListener('keydown', unlockAudio);
       };
-  }, []);
+  }, [gameState]); // Add dependency to re-check if needed
 
   // Calculate widths for health bars
   const playerHealthPercent = (playerStats.hp / playerStats.maxHp) * 100;
@@ -211,22 +215,21 @@ const App: React.FC = () => {
                 <p className="text-xl text-slate-300 font-mono bg-black/50 px-4 py-1 rounded mb-8">"{currentOpponent.description}"</p>
                 
                 {/* Large Portrait - Slide Up Animation */}
-                <div className="relative w-64 h-64 border-4 border-red-600 rounded-full overflow-hidden shadow-[0_0_50px_rgba(220,38,38,0.5)] bg-slate-800 animate-[slide-up_1s_ease-out_forwards]">
+                <div className="relative w-64 h-80 border-4 border-red-600 rounded-xl overflow-hidden shadow-[0_0_50px_rgba(220,38,38,0.5)] bg-slate-800 animate-[slide-up_1s_ease-out_forwards]">
                      <style>{`
                         @keyframes slide-up {
                             0% { transform: translateY(100%) scale(0.5); opacity: 0; }
                             100% { transform: translateY(0) scale(1); opacity: 1; }
                         }
                      `}</style>
-                     {/* We reuse the sprite sheet but just show the idle frame (0,0) roughly */}
                      <div 
-                        className="w-[400%] h-[100%]"
+                        className="w-full h-full"
                         style={{
                             backgroundImage: `url(${currentOpponent.spriteConfig.sheetUrl})`,
-                            backgroundPosition: '0 0', // Idle Frame
-                            backgroundSize: '400% 100%',
-                            transform: 'scale(1.5) translateY(20px)', // Zoom in on face
-                            imageRendering: 'pixelated'
+                            backgroundPosition: 'center',
+                            backgroundSize: 'contain',
+                            backgroundRepeat: 'no-repeat',
+                            imageRendering: 'pixelated' // or 'auto' if high res
                         }}
                      ></div>
                 </div>

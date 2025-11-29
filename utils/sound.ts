@@ -313,6 +313,27 @@ export class SoundEngine {
           this.playTone(783.99, 'triangle', 1.5, 0, 0.2);
       }, notes.length * 80);
   }
+
+  playMenuTheme() {
+      if (!this.ctx) return;
+      // Simple Fun Loop (approx 4 seconds)
+      // We'll just play a sequence once when called, App loop can re-trigger or we make it long.
+      // For CLI, we'll just play a cheerful phrase.
+      const t = this.ctx.currentTime;
+      const speed = 0.15;
+      
+      // "Fun" Melody
+      const notes = [
+          523.25, 523.25, 659.25, 783.99, // C C E G
+          880.00, 783.99, 659.25, 523.25, // A G E C
+          587.33, 587.33, 698.46, 880.00, // D D F A
+          783.99, 659.25, 587.33, 493.88  // G E D B
+      ];
+
+      notes.forEach((freq, i) => {
+          this.playTone(freq, 'triangle', 0.1, i * speed, 0.05);
+      });
+  }
 }
 
 export const soundEngine = new SoundEngine();
