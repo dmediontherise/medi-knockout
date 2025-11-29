@@ -2,7 +2,7 @@
 import { OpponentCharacter } from './types';
 
 export const PLAYER_MAX_HP = 100;
-export const STAMINA_REGEN = 0.6; 
+export const STAMINA_REGEN = 0.8; 
 export const PUNCH_STAMINA_COST = 12;
 export const PUNCH_DAMAGE_BODY = 6;
 export const PUNCH_DAMAGE_HEAD = 10;
@@ -12,9 +12,9 @@ export const MAX_PLAYER_COMBO = 5; // Max hits before AI forces a break
 // Timing in milliseconds
 export const ACTION_DURATION = {
   PUNCH: 150, 
-  DODGE: 350,
+  DODGE: 300,
   BLOCK: 150, 
-  HIT: 350,
+  HIT: 200,
   STUNNED: 1500,
   KO: 3000, 
 };

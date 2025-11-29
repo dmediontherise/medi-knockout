@@ -254,7 +254,7 @@ const Opponent: React.FC<OpponentProps> = ({ state, character, lastHitType }) =>
         case 'medi_jinx': 
             neckColor = "#60A5FA";
             charSVG = (
-                <g transform={tTrans}>
+                <g transform={tTrans} className="transition-transform duration-150 ease-out">
                    {renderLegs("#DC2626", "white", "tights")}
                    <rect x="-15" y="10" width="30" height="40" fill={neckColor} /> {/* Neck */}
                    <rect x="-40" y="40" width="80" height="60" fill="#DC2626" rx="10" /> 
@@ -448,7 +448,7 @@ const Opponent: React.FC<OpponentProps> = ({ state, character, lastHitType }) =>
      if (character.id === 'maga_man') gloveColor = "#1E3A8A";
 
      return (
-         <g transform={`translate(${transform.x}, ${transform.y}) rotate(${transform.r}) scale(${transform.s})`}>
+         <g transform={`translate(${transform.x}, ${transform.y}) rotate(${transform.r}) scale(${transform.s})`} className="transition-transform duration-100 ease-linear">
              <circle cx="0" cy="0" r="22" fill={gloveColor} stroke="black" strokeWidth="2" />
              <path d="M-10 -5 Q0 -15 10 -5" stroke="black" strokeWidth="2" fill="none" opacity="0.5"/>
              {transform.s > 1.5 && (
@@ -460,14 +460,14 @@ const Opponent: React.FC<OpponentProps> = ({ state, character, lastHitType }) =>
 
   const containerClass = useMemo(() => {
       if (isKO) return "animate-knockout-fall pointer-events-none grayscale";
-      if (isHit) return "translate-x-[5px] skew-x-3 brightness-125"; 
-      if (isStunned) return "translate-y-[5px] rotate-2";
-      if (isTelegraphing) return "animate-telegraph brightness-125 sepia";
-      return "animate-idle";
+      if (isHit) return "translate-x-[5px] skew-x-3 brightness-125 duration-75 ease-in"; // Snappier hit
+      if (isStunned) return "translate-y-[5px] rotate-2 duration-200";
+      if (isTelegraphing) return "scale-105 brightness-125 sepia duration-150"; // Smooth telegraph
+      return "animate-idle duration-300"; // Smooth idle return
   }, [state, isKO, isHit, isStunned, isTelegraphing]);
 
   return (
-    <div className={`relative flex justify-center items-end transition-all duration-100 ${containerClass}`}>
+    <div className={`relative flex justify-center items-end transition-all ease-out ${containerClass}`}>
        <div className={`absolute bottom-0 w-[500px] h-[700px] opacity-10 pointer-events-none mix-blend-screen transition-all duration-1000 ${isKO ? 'opacity-0' : ''}`}>
           <svg viewBox="0 0 200 400" className="w-full h-full fill-none stroke-pink-500 stroke-1">
              <path d="M50 150 L150 150 L140 350 L60 350 Z" />
