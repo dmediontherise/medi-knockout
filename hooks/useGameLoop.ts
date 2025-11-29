@@ -46,6 +46,7 @@ export const useGameLoop = () => {
   
   // Game Logic Refs
   const playerComboCount = useRef<number>(0);
+  const difficultyMultiplier = useRef<number>(1.0);
 
   // React State
   const [renderTrigger, setRenderTrigger] = useState(0); 
@@ -69,14 +70,24 @@ export const useGameLoop = () => {
     let nextIndex = opponentIndex;
     if (nextOpponent) {
         nextIndex = (opponentIndex + 1) % ROSTER.length; // Cycle or loop
+        if (nextIndex === 0) {
+            difficultyMultiplier.current += 0.2; // Increase difficulty by 20% each loop
+            triggerFeedback("LEVEL UP!");
+        }
         setOpponentIndex(nextIndex);
+    } else {
+        // Restarting (Game Over or Menu) resets difficulty
+        difficultyMultiplier.current = 1.0;
+        nextIndex = 0;
+        setOpponentIndex(0);
     }
     
     // Setup Stats
     const opp = ROSTER[nextIndex];
+    const scaledHp = Math.floor(opp.stats.maxHp * difficultyMultiplier.current);
 
     playerStats.current = { hp: PLAYER_MAX_HP, maxHp: PLAYER_MAX_HP, stamina: 100, maxStamina: 100, superMeter: 0 };
-    opponentStats.current = { hp: opp.stats.maxHp, maxHp: opp.stats.maxHp, stamina: 100, maxStamina: 100, superMeter: 0 };
+    opponentStats.current = { hp: scaledHp, maxHp: scaledHp, stamina: 100, maxStamina: 100, superMeter: 0 };
     
     playerState.current = PlayerAction.IDLE;
     opponentState.current = OpponentAction.IDLE;
@@ -262,8 +273,8 @@ export const useGameLoop = () => {
       opponentState.current = nextAction;
       opponentActionEndTime.current = now + stats.duration;
 
-      // Apply Character Power Multiplier
-      let finalDamage = Math.floor(stats.damage * currentOpponent.stats.power);
+      // Apply Character Power Multiplier AND Difficulty Multiplier
+      let finalDamage = Math.floor(stats.damage * currentOpponent.stats.power * difficultyMultiplier.current);
 
       // Special Damage Multipliers (Medi Jinx / Mr Yankee)
       if (now < specialStatus.current.doubleDamageUntil) {
