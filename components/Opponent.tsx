@@ -468,7 +468,7 @@ const Opponent: React.FC<OpponentProps> = ({ state, character, lastHitType }) =>
   }, [state, isKO, isHit, isStunned, isTelegraphing]);
 
   return (
-    <div className={`relative flex justify-center items-end transition-all ease-out ${containerClass}`}>
+    <div className={`relative flex justify-center items-end transition-all ease-out will-change-transform ${containerClass}`}>
        <div className={`absolute bottom-0 w-[500px] h-[700px] opacity-10 pointer-events-none mix-blend-screen transition-all duration-1000 ${isKO ? 'opacity-0' : ''}`}>
           <svg viewBox="0 0 200 400" className="w-full h-full fill-none stroke-pink-500 stroke-1">
              <path d="M50 150 L150 150 L140 350 L60 350 Z" />

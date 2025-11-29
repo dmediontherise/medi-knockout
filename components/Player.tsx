@@ -102,7 +102,7 @@ const Player: React.FC<PlayerProps> = ({ state }) => {
   const bodyStroke = isKO ? "stroke-slate-600" : "stroke-green-400";
 
   return (
-    <div className={`relative w-[400px] h-[500px] transition-transform duration-100 ease-out origin-bottom ${containerTransform}`}>
+    <div className={`relative w-[400px] h-[500px] transition-transform duration-100 ease-out origin-bottom will-change-transform ${containerTransform}`}>
       <svg viewBox="0 -160 150 360" className={`w-full h-full fill-none ${bodyStroke} stroke-2 drop-shadow-[0_0_10px_rgba(0,255,0,0.3)]`}>
         
         {/* -- Wireframe Body -- */}
