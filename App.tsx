@@ -222,16 +222,18 @@ const App: React.FC = () => {
                             100% { transform: translateY(0) scale(1); opacity: 1; }
                         }
                      `}</style>
-                     <div 
-                        className="w-full h-full"
+                     <img 
+                        src={currentOpponent.spriteConfig.sheetUrl}
+                        alt={currentOpponent.name}
+                        className="w-full h-full object-contain object-center"
                         style={{
-                            backgroundImage: `url(${currentOpponent.spriteConfig.sheetUrl})`,
-                            backgroundPosition: 'center',
-                            backgroundSize: 'contain',
-                            backgroundRepeat: 'no-repeat',
-                            imageRendering: 'pixelated' // or 'auto' if high res
+                            imageRendering: 'pixelated' 
                         }}
-                     ></div>
+                        onError={(e) => {
+                            // Fallback if image fails
+                            (e.target as HTMLImageElement).style.display = 'none';
+                        }}
+                     />
                 </div>
             </div>
         </div>
