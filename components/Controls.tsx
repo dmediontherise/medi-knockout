@@ -9,8 +9,11 @@ interface ControlsProps {
 }
 
 const Controls: React.FC<ControlsProps> = ({ onAction, onReleaseBlock }) => {
-  // Use Ref instead of State to avoid re-rendering and listener thrashing
+  // Use Ref instead of State to avoid re-rendering and listener thrashing for Keyboard
   const pressedKeys = useRef<Set<string>>(new Set());
+  
+  // Touch State
+  const [headMode, setHeadMode] = React.useState(false);
 
   // Helper to determine action based on key combos
   const determineAction = (keys: Set<string>): PlayerAction | null => {
@@ -26,10 +29,10 @@ const Controls: React.FC<ControlsProps> = ({ onAction, onReleaseBlock }) => {
     if (isRight) return PlayerAction.DODGE_RIGHT;
 
     if (isPunchLeft) {
-        return isUp ? PlayerAction.PUNCH_LEFT_HEAD : PlayerAction.PUNCH_LEFT_BODY;
+        return (isUp || headMode) ? PlayerAction.PUNCH_LEFT_HEAD : PlayerAction.PUNCH_LEFT_BODY;
     }
     if (isPunchRight) {
-        return isUp ? PlayerAction.PUNCH_RIGHT_HEAD : PlayerAction.PUNCH_RIGHT_BODY;
+        return (isUp || headMode) ? PlayerAction.PUNCH_RIGHT_HEAD : PlayerAction.PUNCH_RIGHT_BODY;
     }
 
     return null;
@@ -69,59 +72,65 @@ const Controls: React.FC<ControlsProps> = ({ onAction, onReleaseBlock }) => {
       window.removeEventListener('keydown', handleKeyDown);
       window.removeEventListener('keyup', handleKeyUp);
     };
-  }, [onAction, onReleaseBlock]); // Dependencies are stable callbacks
+  }, [onAction, onReleaseBlock, headMode]); // Re-bind if headMode changes (though mostly for touch)
 
   // Gamepad Style Touch Controls
   return (
-    <div className="absolute bottom-4 left-0 right-0 p-4 flex justify-between pointer-events-auto select-none md:opacity-0 md:pointer-events-none transition-opacity">
+    <div className="w-full h-full flex justify-between items-center px-2 md:px-12 pb-2 pointer-events-auto select-none">
       {/* Left Side: D-Pad (Movement/Defense/Mod) */}
-      <div className="flex flex-col items-center gap-1">
-         {/* Up - Head Mod Visual */}
-         <div className="w-14 h-14 bg-slate-800/80 rounded flex items-center justify-center border-2 border-slate-600 mb-1">
-            <ChevronUp className="w-6 h-6 text-slate-400"/>
-         </div>
+      <div className="flex flex-col items-center gap-2">
+         {/* Up - Head Mod Toggle */}
+         <button 
+            className={`w-16 h-16 rounded-lg flex items-center justify-center border-2 mb-1 transition-all ${headMode ? 'bg-yellow-600 border-yellow-400 shadow-[0_0_15px_rgba(234,179,8,0.5)]' : 'bg-slate-800/80 border-slate-600'}`}
+            onTouchStart={(e) => { e.preventDefault(); setHeadMode(!headMode); }}
+         >
+            <div className="flex flex-col items-center">
+                <ChevronUp className={`w-8 h-8 ${headMode ? 'text-white' : 'text-slate-400'}`}/>
+                <span className="text-[10px] font-bold text-slate-300">AIM HEAD</span>
+            </div>
+         </button>
          
-         <div className="flex gap-1">
+         <div className="flex gap-2">
             <button 
-                className="w-14 h-14 bg-slate-800/80 rounded flex items-center justify-center border-2 border-slate-600 active:bg-blue-500/50"
+                className="w-16 h-16 bg-slate-800/80 rounded-lg flex items-center justify-center border-2 border-slate-600 active:bg-blue-500/50 active:border-blue-400 active:scale-95 transition-transform"
                 onTouchStart={(e) => { e.preventDefault(); onAction(PlayerAction.DODGE_LEFT); }}
             >
-                <ChevronLeft className="w-6 h-6"/>
+                <ChevronLeft className="w-8 h-8 text-slate-300"/>
             </button>
-            <div className="w-14 h-14"></div> {/* Middle Spacer */}
+            
             <button 
-                className="w-14 h-14 bg-slate-800/80 rounded flex items-center justify-center border-2 border-slate-600 active:bg-blue-500/50"
+                className="w-16 h-16 bg-slate-800/80 rounded-lg flex items-center justify-center border-2 border-slate-600 active:bg-blue-500/50 active:border-blue-400 active:scale-95 transition-transform"
                 onTouchStart={(e) => { e.preventDefault(); onAction(PlayerAction.DODGE_RIGHT); }}
             >
-                <ChevronRight className="w-6 h-6"/>
+                <ChevronRight className="w-8 h-8 text-slate-300"/>
             </button>
          </div>
 
          <button 
-             className="w-14 h-14 bg-slate-800/80 rounded flex items-center justify-center border-2 border-slate-600 active:bg-yellow-500/50 mt-1"
+             className="w-32 h-14 bg-slate-800/80 rounded-lg flex items-center justify-center border-2 border-slate-600 active:bg-blue-500/50 active:border-blue-400 active:scale-95 transition-transform mt-1"
              onTouchStart={(e) => { e.preventDefault(); onAction(PlayerAction.BLOCK); }}
              onTouchEnd={(e) => { e.preventDefault(); onReleaseBlock(); }}
          >
-             <ChevronDown className="w-6 h-6"/>
+             <span className="flex items-center gap-1 text-slate-300 font-bold text-sm"><ChevronDown className="w-5 h-5"/> BLOCK</span>
          </button>
       </div>
 
       {/* Right Side: Action Buttons */}
-      <div className="flex gap-4 items-end mb-4">
+      <div className="flex gap-4 items-center pr-2">
          <button 
-           className="w-20 h-20 bg-red-900/80 rounded-full flex flex-col items-center justify-center border-4 border-red-700 active:bg-red-500 shadow-lg"
-           onTouchStart={(e) => { e.preventDefault(); onAction(PlayerAction.PUNCH_LEFT_BODY); }}
+           className={`w-20 h-20 rounded-full flex flex-col items-center justify-center border-4 active:scale-95 transition-transform shadow-lg ${headMode ? 'bg-red-800 border-red-500' : 'bg-red-900/80 border-red-700'}`}
+           onTouchStart={(e) => { e.preventDefault(); onAction(headMode ? PlayerAction.PUNCH_LEFT_HEAD : PlayerAction.PUNCH_LEFT_BODY); }}
          >
-           <Swords className="w-6 h-6 rotate-90"/>
-           <span className="text-[10px] font-bold">L.PUNCH</span>
+           <Swords className="w-8 h-8 rotate-90 text-white"/>
+           <span className="text-[10px] font-bold text-red-200">LEFT</span>
          </button>
          
          <button 
-            className="w-20 h-20 bg-red-900/80 rounded-full flex flex-col items-center justify-center border-4 border-red-700 active:bg-red-500 shadow-lg mb-8"
-            onTouchStart={(e) => { e.preventDefault(); onAction(PlayerAction.PUNCH_RIGHT_BODY); }}
+            className={`w-20 h-20 rounded-full flex flex-col items-center justify-center border-4 active:scale-95 transition-transform shadow-lg mt-12 ${headMode ? 'bg-red-800 border-red-500' : 'bg-red-900/80 border-red-700'}`}
+            onTouchStart={(e) => { e.preventDefault(); onAction(headMode ? PlayerAction.PUNCH_RIGHT_HEAD : PlayerAction.PUNCH_RIGHT_BODY); }}
         >
-            <Swords className="w-6 h-6 rotate-90"/>
-            <span className="text-[10px] font-bold">R.PUNCH</span>
+            <Swords className="w-8 h-8 rotate-90 text-white"/>
+            <span className="text-[10px] font-bold text-red-200">RIGHT</span>
         </button>
       </div>
     </div>

@@ -69,19 +69,19 @@ const App: React.FC = () => {
       )}
 
       {/* --- HUD --- */}
-      <div className="w-full max-w-4xl p-4 flex justify-between items-start z-50 font-retro text-xs md:text-sm absolute top-0 left-1/2 -translate-x-1/2">
+      <div className="w-full max-w-4xl p-2 flex justify-between items-start z-50 font-retro text-[10px] md:text-sm absolute top-0 left-1/2 -translate-x-1/2 pointer-events-none">
         {/* Player Stats */}
-        <div className="flex flex-col gap-1 w-1/3">
-          <div className="text-green-400 drop-shadow-md">MEDI</div>
-          <div className="h-6 w-full bg-slate-800 border-2 border-slate-600 relative skew-x-[-10deg]">
+        <div className="flex flex-col gap-1 w-[40%]">
+          <div className="text-green-400 drop-shadow-md flex justify-between"><span>MEDI</span> <span>LVL 1</span></div>
+          <div className="h-4 md:h-6 w-full bg-slate-800 border-2 border-slate-600 relative skew-x-[-10deg]">
              <div 
                className="h-full bg-gradient-to-r from-green-600 to-green-400 transition-all duration-200 ease-out" 
                style={{ width: `${playerHealthPercent}%` }}
              ></div>
           </div>
           <div className="flex items-center gap-2 mt-1">
-             <span className="text-blue-300">STM</span>
-             <div className="h-3 w-32 bg-slate-800 border border-slate-600">
+             <span className="text-blue-300 text-[8px]">STM</span>
+             <div className="h-2 md:h-3 w-24 bg-slate-800 border border-slate-600">
                 <div 
                     className="h-full bg-blue-400 transition-all duration-100" 
                     style={{ width: `${staminaPercent}%` }}
@@ -91,18 +91,18 @@ const App: React.FC = () => {
         </div>
 
         {/* Timer / Feedback */}
-        <div className="text-center w-1/3 mt-8 pointer-events-none z-50">
+        <div className="text-center w-[20%] mt-4 pointer-events-none z-50 flex justify-center">
             {feedbackMessage && (
-                <div className="text-yellow-400 text-3xl md:text-5xl animate-bounce font-bold drop-shadow-[0_4px_0_rgba(0,0,0,1)] stroke-black tracking-tighter">
+                <div className="absolute top-16 text-yellow-400 text-2xl md:text-5xl animate-bounce font-bold drop-shadow-[0_4px_0_rgba(0,0,0,1)] stroke-black tracking-tighter whitespace-nowrap">
                     {feedbackMessage}
                 </div>
             )}
         </div>
 
         {/* Opponent Stats */}
-        <div className="flex flex-col gap-1 w-1/3 items-end">
-          <div className="text-red-400 drop-shadow-md uppercase">{currentOpponent.name}</div>
-          <div className="h-6 w-full bg-slate-800 border-2 border-slate-600 relative skew-x-[10deg]">
+        <div className="flex flex-col gap-1 w-[40%] items-end">
+          <div className="text-red-400 drop-shadow-md uppercase text-right">{currentOpponent.name}</div>
+          <div className="h-4 md:h-6 w-full bg-slate-800 border-2 border-slate-600 relative skew-x-[10deg]">
              <div 
                className="h-full bg-gradient-to-l from-red-600 to-red-400 transition-all duration-200 ease-out float-right" 
                style={{ width: `${opponentHealthPercent}%` }}
@@ -113,18 +113,18 @@ const App: React.FC = () => {
 
       {/* --- STATUS EFFECTS OVERLAY --- */}
       {activeSpecial === 'INVERTED' && (
-          <div className="absolute top-[20%] left-1/2 -translate-x-1/2 z-40 flex items-center gap-2 text-purple-400 font-bold bg-slate-900/80 px-4 py-2 border border-purple-500 rounded animate-pulse">
-              <RefreshCcw className="animate-spin" size={20} /> CONTROLS INVERTED
+          <div className="absolute top-[15%] left-1/2 -translate-x-1/2 z-40 flex items-center gap-2 text-purple-400 font-bold bg-slate-900/80 px-4 py-2 border border-purple-500 rounded animate-pulse text-xs">
+              <RefreshCcw className="animate-spin" size={16} /> CONTROLS INVERTED
           </div>
       )}
       {activeSpecial === 'BIG_LIE' && (
-          <div className="absolute top-[20%] left-1/2 -translate-x-1/2 z-40 flex items-center gap-2 text-red-500 font-bold bg-slate-900/80 px-4 py-2 border border-red-500 rounded animate-pulse">
-              <AlertTriangle size={20} /> ATTACKS REFLECTED
+          <div className="absolute top-[15%] left-1/2 -translate-x-1/2 z-40 flex items-center gap-2 text-red-500 font-bold bg-slate-900/80 px-4 py-2 border border-red-500 rounded animate-pulse text-xs">
+              <AlertTriangle size={16} /> ATTACKS REFLECTED
           </div>
       )}
 
-      {/* --- Game Scene --- */}
-      <div className="flex-1 w-full relative flex flex-col items-center justify-end overflow-hidden perspective-1000">
+      {/* --- Game Scene (Top 65%) --- */}
+      <div className="relative w-full h-[65%] flex flex-col items-center justify-end overflow-hidden perspective-1000 border-b-4 border-slate-800 bg-slate-900">
           
           {/* Enhanced Animated Background */}
           <Background isPlayerHit={isPlayerHit} isOpponentHit={isOpponentHit} gameState={gameState} />
@@ -133,69 +133,70 @@ const App: React.FC = () => {
           <div className="absolute bottom-[-10%] w-full h-[60%] bg-[linear-gradient(rgba(0,255,100,0.1)_1px,transparent_1px),linear-gradient(90deg,rgba(0,255,100,0.1)_1px,transparent_1px)] bg-[size:50px_50px] [transform:perspective(600px)_rotateX(60deg)] origin-bottom pointer-events-none z-10 opacity-30"></div>
 
           {/* Opponent Layer */}
-          <div className={`transition-all duration-75 z-20 origin-bottom translate-y-[25%] transform scale-[1.85]`}>
+          <div className={`transition-all duration-75 z-20 origin-bottom translate-y-[20%] transform scale-[1.4] md:scale-[1.8]`}>
              <Opponent state={opponentState} character={currentOpponent} lastHitType={lastHitType} />
           </div>
 
           {/* Player Layer */}
-          <div className="absolute bottom-[-5vh] z-30 origin-bottom scale-125 pointer-events-none mix-blend-screen opacity-90">
+          <div className="absolute bottom-[-5vh] z-30 origin-bottom scale-100 md:scale-125 pointer-events-none mix-blend-screen opacity-90">
              <Player state={playerState} />
           </div>
-
       </div>
 
-      {/* --- Menus --- */}
+      {/* --- Menus (Overlay) --- */}
       {gameState === GameState.MENU && (
-        <div className="absolute inset-0 bg-slate-900/95 z-50 flex flex-col items-center justify-center gap-6 text-center p-4">
-            <h1 className="text-5xl md:text-7xl text-green-400 font-retro animate-pulse drop-shadow-[0_0_15px_rgba(0,255,0,0.8)] tracking-tighter">
+        <div className="absolute inset-0 bg-slate-900/95 z-[60] flex flex-col items-center justify-center gap-6 text-center p-4">
+            <h1 className="text-4xl md:text-7xl text-green-400 font-retro animate-pulse drop-shadow-[0_0_15px_rgba(0,255,0,0.8)] tracking-tighter">
                 MEDI<br/>KNOCKOUT 2D
             </h1>
-            <div className="border-4 border-green-500 p-8 rounded-lg bg-slate-800/80 max-w-lg backdrop-blur-md shadow-2xl">
-                <p className="mb-6 text-green-300 font-bold flex items-center justify-center gap-2 text-xl font-retro"><Info size={24}/> HOW TO FIGHT</p>
-                <div className="grid grid-cols-2 gap-6 text-left text-sm text-slate-200 font-mono">
+            <div className="border-4 border-green-500 p-4 md:p-8 rounded-lg bg-slate-800/80 max-w-lg backdrop-blur-md shadow-2xl">
+                <p className="mb-4 text-green-300 font-bold flex items-center justify-center gap-2 text-lg font-retro"><Info size={20}/> HOW TO FIGHT</p>
+                <div className="grid grid-cols-2 gap-4 text-left text-xs md:text-sm text-slate-200 font-mono">
                     <div className="flex flex-col gap-1">
                         <span className="text-green-400 font-bold">ATTACK</span>
-                        <span className="text-xs">Punch: <span className="text-white border border-slate-500 px-1 rounded">Z</span> / <span className="text-white border border-slate-500 px-1 rounded">X</span></span>
-                        <span className="text-xs">Head Shot: Hold <span className="text-white border border-slate-500 px-1 rounded">UP</span> + Punch</span>
+                        <span className="text-[10px]">Tap <span className="text-white border border-slate-500 px-1 rounded">Z/X</span> or <span className="text-white border border-slate-500 px-1 rounded">Buttons</span></span>
+                        <span className="text-[10px]">Head: Hold <span className="text-white border border-slate-500 px-1 rounded">UP/Toggle</span></span>
                     </div>
                     <div className="flex flex-col gap-1">
-                         <span className="text-yellow-400 font-bold">MOVEMENT</span>
-                         <span className="text-xs">Dodge: <span className="text-white border border-slate-500 px-1 rounded">LEFT</span> / <span className="text-white border border-slate-500 px-1 rounded">RIGHT</span></span>
-                         <span className="text-xs">Block: Hold <span className="text-white border border-slate-500 px-1 rounded">DOWN</span></span>
+                         <span className="text-yellow-400 font-bold">DEFENSE</span>
+                         <span className="text-[10px]">Dodge: <span className="text-white border border-slate-500 px-1 rounded">LEFT/RIGHT</span></span>
+                         <span className="text-[10px]">Block: Hold <span className="text-white border border-slate-500 px-1 rounded">DOWN</span></span>
                     </div>
                 </div>
             </div>
             <button 
                 onClick={() => resetGame(false)}
-                className="flex items-center gap-3 px-10 py-5 bg-green-600 hover:bg-green-500 text-white font-retro text-xl rounded shadow-[0_0_25px_rgba(34,197,94,0.6)] transition-all transform hover:scale-110 active:scale-95 mt-4"
+                className="flex items-center gap-3 px-8 py-4 bg-green-600 hover:bg-green-500 text-white font-retro text-lg rounded shadow-[0_0_25px_rgba(34,197,94,0.6)] transition-all transform hover:scale-110 active:scale-95 mt-4"
             >
-                <Play size={24} /> ENTER RING
+                <Play size={20} /> ENTER RING
             </button>
         </div>
       )}
 
       {gameState === GameState.VICTORY && (
-        <div className="absolute inset-0 bg-green-900/90 z-50 flex flex-col items-center justify-center animate-fade-in text-center backdrop-blur-sm">
-             <Trophy size={100} className="text-yellow-400 mb-6 animate-bounce drop-shadow-[0_0_30px_rgba(255,215,0,0.8)]" />
-             <h2 className="text-7xl font-retro text-white mb-4 drop-shadow-xl italic transform -skew-x-12">KO!</h2>
-             <p className="text-3xl text-green-200 mb-12 font-mono tracking-widest">YOU DEFEATED {currentOpponent.name}</p>
-             <button onClick={() => resetGame(true)} className="px-10 py-5 bg-white text-green-900 font-bold rounded hover:bg-gray-200 font-retro text-xl shadow-xl transform transition hover:scale-105">NEXT FIGHT</button>
+        <div className="absolute inset-0 bg-green-900/90 z-[60] flex flex-col items-center justify-center animate-fade-in text-center backdrop-blur-sm p-4">
+             <Trophy size={80} className="text-yellow-400 mb-4 animate-bounce drop-shadow-[0_0_30px_rgba(255,215,0,0.8)]" />
+             <h2 className="text-5xl md:text-7xl font-retro text-white mb-2 drop-shadow-xl italic transform -skew-x-12">KO!</h2>
+             <p className="text-xl md:text-3xl text-green-200 mb-8 font-mono tracking-widest">YOU DEFEATED {currentOpponent.name}</p>
+             <button onClick={() => resetGame(true)} className="px-8 py-4 bg-white text-green-900 font-bold rounded hover:bg-gray-200 font-retro text-lg shadow-xl transform transition hover:scale-105">NEXT FIGHT</button>
         </div>
       )}
 
       {gameState === GameState.GAME_OVER && (
-        <div className="absolute inset-0 bg-red-900/90 z-50 flex flex-col items-center justify-center animate-fade-in text-center backdrop-blur-sm">
-             <Skull size={100} className="text-slate-200 mb-6 animate-pulse drop-shadow-[0_0_30px_rgba(255,0,0,0.8)]" />
-             <h2 className="text-7xl font-retro text-white mb-4 drop-shadow-xl italic transform -skew-x-12">TKO</h2>
-             <p className="text-3xl text-red-200 mb-12 font-mono tracking-widest">DOWN FOR THE COUNT</p>
-             <button onClick={() => resetGame(false)} className="px-10 py-5 bg-white text-red-900 font-bold rounded hover:bg-gray-200 font-retro text-xl shadow-xl transform transition hover:scale-105">REMATCH</button>
+        <div className="absolute inset-0 bg-red-900/90 z-[60] flex flex-col items-center justify-center animate-fade-in text-center backdrop-blur-sm p-4">
+             <Skull size={80} className="text-slate-200 mb-4 animate-pulse drop-shadow-[0_0_30px_rgba(255,0,0,0.8)]" />
+             <h2 className="text-5xl md:text-7xl font-retro text-white mb-2 drop-shadow-xl italic transform -skew-x-12">TKO</h2>
+             <p className="text-xl md:text-3xl text-red-200 mb-8 font-mono tracking-widest">DOWN FOR THE COUNT</p>
+             <button onClick={() => resetGame(false)} className="px-8 py-4 bg-white text-red-900 font-bold rounded hover:bg-gray-200 font-retro text-lg shadow-xl transform transition hover:scale-105">REMATCH</button>
         </div>
       )}
 
-      {/* --- Controls --- */}
-      {gameState === GameState.PLAYING && (
-         <Controls onAction={handlePlayerInput} onReleaseBlock={releaseBlock} />
-      )}
+      {/* --- Controls Area (Bottom 35%) --- */}
+      <div className="w-full h-[35%] bg-slate-950 border-t-4 border-slate-700 relative z-50">
+          {gameState === GameState.PLAYING && (
+             <Controls onAction={handlePlayerInput} onReleaseBlock={releaseBlock} />
+          )}
+      </div>
     </div>
   );
 };
