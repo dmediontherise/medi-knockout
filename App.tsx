@@ -148,7 +148,7 @@ const App: React.FC = () => {
       )}
 
       {/* --- Game Scene (Flex Grow) --- */}
-      <div className="relative w-full flex-1 flex flex-col items-center justify-end overflow-hidden perspective-1000 border-b-4 border-slate-800 bg-slate-900 min-h-0">
+      <div className="relative w-full max-w-[600px] mx-auto flex-1 flex flex-col items-center justify-end overflow-hidden perspective-1000 border-b-4 border-slate-800 bg-slate-900 min-h-0 shadow-2xl">
           
           {/* Enhanced Animated Background */}
           <Background isPlayerHit={isPlayerHit} isOpponentHit={isOpponentHit} gameState={gameState} />
@@ -157,12 +157,12 @@ const App: React.FC = () => {
           <div className="absolute bottom-[-10%] w-full h-[60%] bg-[linear-gradient(rgba(0,255,100,0.1)_1px,transparent_1px),linear-gradient(90deg,rgba(0,255,100,0.1)_1px,transparent_1px)] bg-[size:50px_50px] [transform:perspective(600px)_rotateX(60deg)] origin-bottom pointer-events-none z-10 opacity-30"></div>
 
           {/* Opponent Layer */}
-          <div className={`transition-all duration-75 z-20 origin-bottom translate-y-[35%] transform scale-[1.25] md:scale-[1.8]`}>
+          <div className={`transition-all duration-75 z-20 origin-bottom translate-y-[30%] transform scale-[1.3]`}>
              <Opponent state={opponentState} character={currentOpponent} lastHitType={lastHitType} />
           </div>
 
           {/* Player Layer */}
-          <div className="absolute bottom-[-8vh] z-30 origin-bottom scale-95 md:scale-125 pointer-events-none mix-blend-screen opacity-90">
+          <div className="absolute bottom-[-5%] z-30 origin-bottom scale-[1.1] pointer-events-none mix-blend-screen opacity-90">
              <Player state={playerState} />
           </div>
       </div>
