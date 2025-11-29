@@ -252,21 +252,29 @@ const Opponent: React.FC<OpponentProps> = ({ state, character, lastHitType }) =>
             {/* Shadow */}
             <ellipse cx="0" cy="380" rx="80" ry="20" fill="black" opacity="0.4" />
             
-            {/* Character Sprite */}
-            <image 
-                href={character.spriteConfig.sheetUrl} 
-                x="-150" 
-                y="-50" 
-                width="300" 
-                height="450" 
-                preserveAspectRatio="xMidYMid meet"
-                style={{
-                    transformOrigin: 'center bottom',
-                    transform: `rotate(${pose.torso.r}deg) ${isHit ? 'scale(0.95)' : 'scale(1)'}`,
-                    filter: isHit ? 'brightness(1.5) sepia(0.5) hue-rotate(-30deg)' : 'none',
-                    transition: 'all 0.1s ease-out'
-                }}
-            />
+            {/* Character Sprite (CSS Animation) */}
+            <foreignObject x="-150" y="-50" width="300" height="450">
+                <div 
+                    style={{
+                        width: '100%',
+                        height: '100%',
+                        backgroundImage: `url(${character.spriteConfig.sheetUrl})`,
+                        backgroundSize: '400% 100%', // Assume 4 frames in a row
+                        backgroundPosition: (() => {
+                            if (isKO) return '100% 0';
+                            if (isHit) return '66% 0';
+                            if (isPunching) return '33% 0';
+                            return '0% 0';
+                        })(),
+                        backgroundRepeat: 'no-repeat',
+                        transformOrigin: 'center bottom',
+                        transform: `rotate(${pose.torso.r}deg) ${isHit ? 'scale(0.95)' : 'scale(1)'}`,
+                        filter: isHit ? 'brightness(1.5) sepia(0.5) hue-rotate(-30deg)' : 'none',
+                        transition: 'background-position 0.1s steps(1), transform 0.1s ease-out',
+                        imageRendering: 'pixelated'
+                    }}
+                />
+            </foreignObject>
 
             {/* Hit Effects */}
             {isHit && (

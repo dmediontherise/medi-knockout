@@ -106,20 +106,28 @@ const Player: React.FC<PlayerProps> = ({ state }) => {
       <svg viewBox="0 -160 150 360" className={`w-full h-full fill-none ${bodyStroke} stroke-2 drop-shadow-[0_0_10px_rgba(0,255,0,0.3)] overflow-visible`}>
         
         {/* -- Character Sprite -- */}
-        <image 
-             href="/medi-knockout/assets/player_sprite.png" 
-             x="-50" 
-             y="-180" 
-             width="250" 
-             height="400" 
-             preserveAspectRatio="xMidYMid meet"
-             style={{
-                 transformOrigin: '75px 100px',
-                 transform: `rotate(${torsoTwist * -1}deg) ${isHit ? 'scale(0.95)' : 'scale(1)'}`,
-                 filter: isHit ? 'brightness(1.5) sepia(1) hue-rotate(-50deg)' : 'none',
-                 transition: 'all 0.1s ease-out'
-             }}
-        />
+        <foreignObject x="-50" y="-180" width="250" height="400">
+             <div 
+                style={{
+                    width: '100%',
+                    height: '100%',
+                    backgroundImage: 'url(/medi-knockout/assets/player_sprite.png)',
+                    backgroundSize: '400% 100%',
+                    backgroundPosition: (() => {
+                        if (isKO) return '100% 0';
+                        if (isHit) return '66% 0';
+                        if (state.toString().includes('PUNCH')) return '33% 0';
+                        return '0% 0';
+                    })(),
+                    backgroundRepeat: 'no-repeat',
+                    transformOrigin: '75px 100px',
+                    transform: `rotate(${torsoTwist * -1}deg) ${isHit ? 'scale(0.95)' : 'scale(1)'}`,
+                    filter: isHit ? 'brightness(1.5) sepia(1) hue-rotate(-50deg)' : 'none',
+                    transition: 'background-position 0.1s steps(1), transform 0.1s ease-out',
+                    imageRendering: 'pixelated'
+                }}
+             />
+        </foreignObject>
 
         {/* -- Arms (Calculated Paths) -- */}
         {/* Left Arm: Shoulder -> Elbow -> Hand */}
