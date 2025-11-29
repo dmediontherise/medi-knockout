@@ -54,6 +54,10 @@ const App: React.FC = () => {
         }
       `}</style>
 
+      {/* CRT Effects */}
+      <div className="scanlines"></div>
+      <div className="crt-flicker"></div>
+      
       {/* Hit Flash FX (Screen Red Flash) */}
       {isPlayerHit && (
           <div className="absolute inset-0 bg-red-600/40 z-40 animate-pulse pointer-events-none mix-blend-overlay"></div>

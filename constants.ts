@@ -68,7 +68,7 @@ export const ROSTER: OpponentCharacter[] = [
     name: "AINT MAN",
     description: "The Gold Standard. Balanced and tough.",
     stats: { maxHp: 200, power: 1.0, speed: 1.0 },
-    spriteConfig: { sheetUrl: "/medi-knockout/assets/aint_man.jpg", frameWidth: 64, frameHeight: 64, scale: 6, frames: { IDLE:[0,0], BLOCK:[0,0], HIT:[0,0], KO:[0,0], PUNCH_JAB:[0,0], PUNCH_HOOK:[0,0], PUNCH_UPPERCUT:[0,0] } },
+    spriteConfig: { sheetUrl: "", frameWidth: 64, frameHeight: 64, scale: 6, frames: { IDLE:[0,0], BLOCK:[0,0], HIT:[0,0], KO:[0,0], PUNCH_JAB:[0,0], PUNCH_HOOK:[0,0], PUNCH_UPPERCUT:[0,0] } },
     aiPatternOverride: AI_PATTERNS.BASIC_ONE_TWO
   },
   {
@@ -76,7 +76,7 @@ export const ROSTER: OpponentCharacter[] = [
     name: "MEDI JINX",
     description: "Fast, annoying, and mischievous.",
     stats: { maxHp: 150, power: 0.8, speed: 0.8 }, 
-    spriteConfig: { sheetUrl: "/medi-knockout/assets/medi_jinx.jpg", frameWidth: 64, frameHeight: 64, scale: 6, frames: { IDLE:[0,0], BLOCK:[0,0], HIT:[0,0], KO:[0,0], PUNCH_JAB:[0,0], PUNCH_HOOK:[0,0], PUNCH_UPPERCUT:[0,0] } },
+    spriteConfig: { sheetUrl: "", frameWidth: 64, frameHeight: 64, scale: 6, frames: { IDLE:[0,0], BLOCK:[0,0], HIT:[0,0], KO:[0,0], PUNCH_JAB:[0,0], PUNCH_HOOK:[0,0], PUNCH_UPPERCUT:[0,0] } },
     aiPatternOverride: AI_PATTERNS.THE_28_3_CHOKE
   },
   {
@@ -84,7 +84,7 @@ export const ROSTER: OpponentCharacter[] = [
     name: "DJ TITO",
     description: "Rhythm-based counter puncher.",
     stats: { maxHp: 180, power: 1.0, speed: 1.1 },
-    spriteConfig: { sheetUrl: "/medi-knockout/assets/dj_tito.jpg", frameWidth: 64, frameHeight: 64, scale: 6, frames: { IDLE:[0,0], BLOCK:[0,0], HIT:[0,0], KO:[0,0], PUNCH_JAB:[0,0], PUNCH_HOOK:[0,0], PUNCH_UPPERCUT:[0,0] } },
+    spriteConfig: { sheetUrl: "", frameWidth: 64, frameHeight: 64, scale: 6, frames: { IDLE:[0,0], BLOCK:[0,0], HIT:[0,0], KO:[0,0], PUNCH_JAB:[0,0], PUNCH_HOOK:[0,0], PUNCH_UPPERCUT:[0,0] } },
     aiPatternOverride: AI_PATTERNS.THE_BEAT_DROP
   },
   {
@@ -92,7 +92,7 @@ export const ROSTER: OpponentCharacter[] = [
     name: "MR. YANKEE",
     description: "Slow but hits like a truck.",
     stats: { maxHp: 250, power: 1.4, speed: 1.3 },
-    spriteConfig: { sheetUrl: "/medi-knockout/assets/mr_yankee.jpg", frameWidth: 64, frameHeight: 64, scale: 6, frames: { IDLE:[0,0], BLOCK:[0,0], HIT:[0,0], KO:[0,0], PUNCH_JAB:[0,0], PUNCH_HOOK:[0,0], PUNCH_UPPERCUT:[0,0] } },
+    spriteConfig: { sheetUrl: "", frameWidth: 64, frameHeight: 64, scale: 6, frames: { IDLE:[0,0], BLOCK:[0,0], HIT:[0,0], KO:[0,0], PUNCH_JAB:[0,0], PUNCH_HOOK:[0,0], PUNCH_UPPERCUT:[0,0] } },
     aiPatternOverride: AI_PATTERNS.PINSTRIPE_PUNCHES
   },
   {
@@ -100,7 +100,7 @@ export const ROSTER: OpponentCharacter[] = [
     name: "MAGA MAN",
     description: "Brawler with wild swings.",
     stats: { maxHp: 220, power: 1.1, speed: 1.0 },
-    spriteConfig: { sheetUrl: "/medi-knockout/assets/maga_man.jpg", frameWidth: 64, frameHeight: 64, scale: 6, frames: { IDLE:[0,0], BLOCK:[0,0], HIT:[0,0], KO:[0,0], PUNCH_JAB:[0,0], PUNCH_HOOK:[0,0], PUNCH_UPPERCUT:[0,0] } },
+    spriteConfig: { sheetUrl: "", frameWidth: 64, frameHeight: 64, scale: 6, frames: { IDLE:[0,0], BLOCK:[0,0], HIT:[0,0], KO:[0,0], PUNCH_JAB:[0,0], PUNCH_HOOK:[0,0], PUNCH_UPPERCUT:[0,0] } },
     aiPatternOverride: AI_PATTERNS.THE_WALL
   }
 ];

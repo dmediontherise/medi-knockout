@@ -242,41 +242,184 @@ const Opponent: React.FC<OpponentProps> = ({ state, character, lastHitType }) =>
   };
 
 
-  // -- Character Art Assets (Replaced with Image Sprite) --
+  // -- Character Art Assets (SVG Puppets) --
   const renderCharacterArt = () => {
-    // Torso transforms for bobbing effect
-    const tTransY = pose.legs.hipsY + pose.torso.y;
-    
-    return (
-        <g transform={`translate(0, ${tTransY})`}>
-            {/* Shadow */}
-            <ellipse cx="0" cy="380" rx="80" ry="20" fill="black" opacity="0.4" />
-            
-            {/* Character Sprite (CSS Animation) */}
-            <foreignObject x="-150" y="-50" width="300" height="450">
-                <div 
-                    style={{
-                        width: '100%',
-                        height: '100%',
-                        backgroundImage: `url(${character.spriteConfig.sheetUrl})`,
-                        backgroundSize: '400% 100%', // Assume 4 frames in a row
-                        backgroundPosition: (() => {
-                            if (isKO) return '100% 0';
-                            if (isHit) return '66% 0';
-                            if (isPunching) return '33% 0';
-                            return '0% 0';
-                        })(),
-                        backgroundRepeat: 'no-repeat',
-                        transformOrigin: 'center bottom',
-                        transform: `rotate(${pose.torso.r}deg) ${isHit ? 'scale(0.95)' : 'scale(1)'}`,
-                        filter: isHit ? 'brightness(1.5) sepia(0.5) hue-rotate(-30deg)' : 'none',
-                        transition: 'background-position 0.1s steps(1), transform 0.1s ease-out',
-                        imageRendering: 'pixelated'
-                    }}
-                />
-            </foreignObject>
+    // Torso transforms
+    const tTrans = `translate(0, ${pose.legs.hipsY + pose.torso.y})`;
 
-            {/* Hit Effects */}
+    let charSVG = null;
+    let neckColor = "#A97142"; // Default Skin
+
+    switch(character.id) {
+        case 'medi_jinx': 
+            neckColor = "#60A5FA";
+            charSVG = (
+                <g transform={tTrans}>
+                   {renderLegs("#DC2626", "white", "tights")}
+                   <rect x="-15" y="10" width="30" height="40" fill={neckColor} /> {/* Neck */}
+                   <rect x="-40" y="40" width="80" height="60" fill="#DC2626" rx="10" /> 
+                   <text x="0" y="75" fontSize="20" textAnchor="middle" fill="black" fontWeight="bold" transform="rotate(-10)">28-3</text>
+                   
+                   <g transform={`translate(${pose.head.x}, ${pose.head.y}) rotate(${pose.head.r})`}>
+                       <circle cx="0" cy="0" r="40" fill="#60A5FA" />
+                       <g transform={isHit ? "translate(0, -30) rotate(-20)" : ""}>
+                            <path d="M-40 0 Q0 10 40 0 V-45 H-40 Z" fill="#1F2937" /> 
+                       </g>
+                       {isHit ? (
+                           <g>
+                               <circle cx="-15" cy="5" r="14" fill="white" stroke="black" /> <circle cx="-15" cy="5" r="3" fill="black" />
+                               <circle cx="15" cy="5" r="14" fill="white" stroke="black" /> <circle cx="15" cy="5" r="3" fill="black" />
+                               <ellipse cx="0" cy="25" rx="10" ry="15" fill="black" />
+                           </g>
+                       ) : (
+                           <g>
+                                <circle cx="-15" cy="5" r="9" fill="white" /> <circle cx="-15" cy="5" r="2" fill="black" />
+                                <circle cx="15" cy="5" r="9" fill="white" /> <circle cx="15" cy="5" r="2" fill="black" />
+                                <path d="M-25 25 Q0 40 25 25" stroke="white" strokeWidth="5" fill="none" /> 
+                           </g>
+                       )}
+                       {isKO && <text x="0" y="10" fontSize="35" textAnchor="middle" fill="black">XX</text>}
+                   </g>
+                </g>
+            );
+            break;
+        case 'dj_tito': 
+            neckColor = "#A97142";
+            charSVG = (
+                <g transform={tTrans}>
+                    {renderLegs("#111827", "#FBBF24", "long")}
+                    <rect x="-15" y="10" width="30" height="40" fill={neckColor} /> {/* Neck */}
+                    <path d="M-45 40 L45 40 L40 100 L-40 100 Z" fill="#1F2937" />
+                    <circle cx="0" cy="65" r="12" fill="#FBBF24" opacity="0.5" />
+                    <g transform={`translate(${pose.head.x}, ${pose.head.y}) rotate(${pose.head.r})`}>
+                        <circle cx="0" cy="0" r="38" fill="#A97142" />
+                        <g transform={isHit ? "translate(-20, -10) rotate(-30)" : ""}>
+                             <rect x="-48" y="-15" width="12" height="35" fill="#9CA3AF" rx="2" />
+                        </g>
+                        <g transform={isHit ? "translate(20, -10) rotate(30)" : ""}>
+                             <rect x="36" y="-15" width="12" height="35" fill="#9CA3AF" rx="2" />
+                        </g>
+                        {!isHit && <path d="M-40 -10 L40 -10" stroke="#374151" strokeWidth="22" strokeLinecap="round" />}
+                        <g transform={isHit ? "rotate(20)" : ""}>
+                             <rect x="-25" y="-5" width="50" height="18" fill="black" rx="2" />
+                        </g>
+                        {isHit && <ellipse cx="0" cy="28" rx="8" ry="12" fill="black" />}
+                        {isKO && <text x="0" y="25" fontSize="20" textAnchor="middle" fill="white">RIP</text>}
+                    </g>
+                </g>
+            );
+            break;
+        case 'mr_yankee': 
+            neckColor = "#E2E8F0";
+            charSVG = (
+                <g transform={tTrans}>
+                    {renderLegs("#F8FAFC", "#1E293B", "long")}
+                    <path d="M-20 120 L-20 200" stroke="#1E293B" strokeWidth="2" opacity="0.3" />
+                    <path d="M20 120 L20 200" stroke="#1E293B" strokeWidth="2" opacity="0.3" />
+                    <rect x="-18" y="10" width="36" height="40" fill={neckColor} /> {/* Neck */}
+                    <rect x="-50" y="40" width="100" height="80" fill="#F8FAFC" stroke="#1E293B" strokeWidth="2"/>
+                    <path d="M-30 40 V120 M-10 40 V120 M10 40 V120 M30 40 V120" stroke="#1E293B" strokeWidth="2" />
+                    <g transform={`translate(${pose.head.x}, ${pose.head.y}) rotate(${pose.head.r})`}>
+                        <circle cx="0" cy="0" r="45" fill="white" stroke="#CBD5E1" strokeWidth="1"/>
+                        <path d="M-28 -28 Q0 -5 28 -28" stroke="#EF4444" strokeWidth={isHit ? 6 : 3} fill="none" strokeDasharray={isHit ? "10 5" : "4 2"}/>
+                        <path d="M-28 28 Q0 5 28 28" stroke="#EF4444" strokeWidth={isHit ? 6 : 3} fill="none" strokeDasharray={isHit ? "10 5" : "4 2"}/>
+                        {isHit ? (
+                             <g>
+                                 <path d="M-20 -10 L-10 0 M-10 -10 L-20 0" stroke="black" strokeWidth="3" />
+                                 <path d="M20 -10 L10 0 M10 -10 L20 0" stroke="black" strokeWidth="3" />
+                                 <path d="M-15 20 Q0 5 15 20" stroke="black" strokeWidth="3" fill="none"/>
+                             </g>
+                        ) : (
+                             <g>
+                                 <circle cx="-18" cy="-5" r="5" fill="black" />
+                                 <circle cx="18" cy="-5" r="5" fill="black" />
+                                 <path d="M-12 15 Q0 20 12 15" stroke="black" strokeWidth="3" fill="none"/>
+                             </g>
+                        )}
+                        {isKO && <path d="M-25 -10 L25 10 M25 -10 L-25 10" stroke="red" strokeWidth="5" />}
+                    </g>
+                </g>
+            );
+            break;
+        case 'maga_man': 
+            neckColor = "#FB923C";
+            charSVG = (
+                <g transform={tTrans}>
+                    {renderLegs("#1E3A8A", "black", "long")}
+                    <rect x="-15" y="10" width="30" height="40" fill={neckColor} /> {/* Neck */}
+                    <path d="M-50 40 L50 40 L45 120 L-45 120 Z" fill="#1E3A8A" />
+                    <path d="M0 40 L0 120" stroke="white" strokeWidth="25" />
+                    <path d="M0 40 L8 110 L0 120 L-8 110 Z" fill="#DC2626" />
+                    <g transform={`translate(${pose.head.x}, ${pose.head.y}) rotate(${pose.head.r})`}>
+                        <circle cx="0" cy="0" r="40" fill={isHit ? "#EF4444" : "#FB923C"} />
+                        <g transform={isHit ? "rotate(-45) translate(-10,-10)" : ""}>
+                            <path d="M-40 -15 L40 -15 L35 -40 L-35 -40 Z" fill="#DC2626" />
+                            <rect x="-42" y="-15" width="84" height="6" fill="#DC2626" />
+                            <text x="0" y="-22" fontSize="10" textAnchor="middle" fill="white">MAGA</text>
+                        </g>
+                        {isHit ? (
+                             <g>
+                                 <circle cx="-12" cy="5" r="2" fill="black" /> <circle cx="12" cy="5" r="2" fill="black" />
+                                 <circle cx="0" cy="25" r="10" fill="black" />
+                             </g>
+                        ) : (
+                             <g>
+                                 <circle cx="-12" cy="5" r="3" fill="black" /> <circle cx="12" cy="5" r="3" fill="black" />
+                                 <path d="M-8 25 Q0 20 8 25" stroke="black" strokeWidth="2" fill="none" />
+                             </g>
+                        )}
+                        {isKO && <text x="0" y="10" fontSize="30" textAnchor="middle" fill="black">XX</text>}
+                    </g>
+                </g>
+            );
+            break;
+        default: // AINT MAN
+            neckColor = "#1F2937";
+            charSVG = (
+                 <g transform={tTrans}>
+                    {renderLegs("black", "#FBBF24", "tights")}
+                    <rect x="-35" y="140" width="10" height="30" fill="#FBBF24" />
+                    <rect x="25" y="140" width="10" height="30" fill="#FBBF24" />
+                    
+                    <rect x="-15" y="10" width="30" height="40" fill={neckColor} /> {/* Neck */}
+                    
+                    <path d="M-50 40 L50 40 L40 110 L-40 110 Z" fill="#000000" />
+                    <path d="M-40 40 L0 110 L40 40" fill="none" stroke="#FBBF24" strokeWidth="5" />
+                    <g transform={`translate(${pose.head.x}, ${pose.head.y}) rotate(${pose.head.r})`}>
+                        <circle cx="0" cy="0" r="40" fill="#A97142" />
+                        <g transform={isHit ? "rotate(10) translate(0, -5)" : ""}>
+                             <rect x="-40" y="-35" width="80" height="25" fill="#FBBF24" rx="5" />
+                             <rect x="-6" y="-35" width="12" height="25" fill="black" />
+                        </g>
+                        {isHit ? (
+                             <g>
+                                <path d="M-15 -5 L-5 5 M-5 -5 L-15 5" stroke="black" strokeWidth="2" />
+                                <path d="M15 -5 L5 5 M5 -5 L15 5" stroke="black" strokeWidth="2" />
+                                <rect x="-12" y="18" width="24" height="12" fill="black" rx="5" />
+                             </g>
+                        ) : (
+                             <g>
+                                <circle cx="-14" cy="0" r="4" fill="black" /> <circle cx="14" cy="0" r="4" fill="black" />
+                                <rect x="-12" y="18" width="24" height="6" fill="black" rx="2" />
+                             </g>
+                        )}
+                        {isKO && <text x="0" y="0" fontSize="30" textAnchor="middle" fill="black">XX</text>}
+                    </g>
+                </g>
+            );
+            break;
+    }
+
+    return (
+        <g>
+            {renderArm('left', pose.lArm)}
+            {renderArm('right', pose.rArm)}
+            
+            <g transform={`rotate(${pose.torso.r})`}>
+                 {charSVG}
+            </g>
+
+            {/* Starburst */}
             {isHit && (
                 <g transform={`translate(${pose.head.x}, ${pose.head.y})`}>
                     <path 
