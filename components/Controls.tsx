@@ -76,7 +76,7 @@ const Controls: React.FC<ControlsProps> = ({ onAction, onReleaseBlock }) => {
 
   // Gamepad Style Touch Controls
   return (
-    <div className="w-full h-full flex justify-between items-center px-2 md:px-12 pb-2 pointer-events-auto select-none">
+    <div className="w-full h-full flex justify-between items-center px-2 md:px-12 pb-0 pointer-events-auto select-none">
       {/* Left Side: D-Pad (Movement/Defense/Mod) */}
       <div className="flex flex-col items-center gap-2">
          {/* Up - Head Mod Toggle */}

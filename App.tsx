@@ -33,7 +33,7 @@ const App: React.FC = () => {
   const isOpponentHit = opponentState.toString().startsWith('HIT');
 
   return (
-    <div className={`relative w-full h-screen bg-slate-950 overflow-hidden flex flex-col items-center select-none ${isPlayerHit ? 'animate-shake' : ''}`}>
+    <div className={`fixed inset-0 w-full h-[100dvh] bg-slate-950 overflow-hidden flex flex-col items-center select-none touch-none ${isPlayerHit ? 'animate-shake' : ''}`}>
       {/* CSS Shake Animation */}
       <style>{`
         @keyframes shake {
@@ -69,7 +69,7 @@ const App: React.FC = () => {
       )}
 
       {/* --- HUD --- */}
-      <div className="w-full max-w-4xl p-2 flex justify-between items-start z-50 font-retro text-[10px] md:text-sm absolute top-0 left-1/2 -translate-x-1/2 pointer-events-none">
+      <div className="w-full max-w-4xl p-2 pt-safe-top flex justify-between items-start z-50 font-retro text-[10px] md:text-sm absolute top-0 left-1/2 -translate-x-1/2 pointer-events-none">
         {/* Player Stats */}
         <div className="flex flex-col gap-1 w-[40%]">
           <div className="text-green-400 drop-shadow-md flex justify-between"><span>MEDI</span> <span>LVL 1</span></div>
@@ -123,8 +123,8 @@ const App: React.FC = () => {
           </div>
       )}
 
-      {/* --- Game Scene (Top 65%) --- */}
-      <div className="relative w-full h-[65%] flex flex-col items-center justify-end overflow-hidden perspective-1000 border-b-4 border-slate-800 bg-slate-900">
+      {/* --- Game Scene (Flex Grow) --- */}
+      <div className="relative w-full flex-1 flex flex-col items-center justify-end overflow-hidden perspective-1000 border-b-4 border-slate-800 bg-slate-900 min-h-0">
           
           {/* Enhanced Animated Background */}
           <Background isPlayerHit={isPlayerHit} isOpponentHit={isOpponentHit} gameState={gameState} />
@@ -192,7 +192,7 @@ const App: React.FC = () => {
       )}
 
       {/* --- Controls Area (Bottom 35%) --- */}
-      <div className="w-full h-[35%] bg-slate-950 border-t-4 border-slate-700 relative z-50">
+      <div className="w-full h-[35%] min-h-[220px] bg-slate-950 border-t-4 border-slate-700 relative z-50 flex-shrink-0 pb-safe-bottom">
           {gameState === GameState.PLAYING && (
              <Controls onAction={handlePlayerInput} onReleaseBlock={releaseBlock} />
           )}
