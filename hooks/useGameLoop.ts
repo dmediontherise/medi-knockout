@@ -107,6 +107,7 @@ export const useGameLoop = () => {
     // Transition to Round Start (Ready... Fight!)
     setTimeout(() => {
         setGameState(GameState.ROUND_START);
+        setFeedbackMessage("READY?");
         soundEngine.playReady();
         
         // Delay for "FIGHT!"
@@ -346,7 +347,7 @@ export const useGameLoop = () => {
   };
 
   const handlePlayerInput = useCallback((action: PlayerAction) => {
-    if (gameState !== GameState.PLAYING) return;
+    if (gameState !== GameState.PLAYING && gameState !== GameState.ROUND_START) return;
     const now = Date.now();
 
     if (playerState.current === PlayerAction.HIT || playerState.current === PlayerAction.KO) return;

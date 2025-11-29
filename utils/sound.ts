@@ -12,7 +12,7 @@ export class SoundEngine {
     this.ctx = new AudioContextClass();
     
     this.masterGain = this.ctx.createGain();
-    this.masterGain.gain.value = 0.5; // Increased Master Volume
+    this.masterGain.gain.value = 0.8; // Louder
     this.masterGain.connect(this.ctx.destination);
     
     if (this.ctx.state === 'suspended') {
@@ -23,10 +23,16 @@ export class SoundEngine {
   }
 
   resume() {
-    if (this.ctx && this.ctx.state === 'suspended') {
-      this.ctx.resume().then(() => {
-          console.log("AudioContext resumed successfully");
-      }).catch(e => console.error("Failed to resume AudioContext:", e));
+    if (this.ctx) {
+      if (this.ctx.state === 'suspended') {
+        this.ctx.resume();
+      }
+      // Play silent buffer to warm up engine (iOS fix)
+      const buffer = this.ctx.createBuffer(1, 1, 22050);
+      const source = this.ctx.createBufferSource();
+      source.buffer = buffer;
+      source.connect(this.ctx.destination);
+      source.start(0);
     }
   }
 
@@ -53,6 +59,8 @@ export class SoundEngine {
 
   private playTone(freq: number, type: OscillatorType, duration: number, startTime: number = 0, volume: number = 0.1) {
     if (!this.ctx || !this.masterGain) return;
+    if (this.ctx.state === 'suspended') this.ctx.resume();
+
     // console.log(`Playing tone: ${freq}Hz`);
     const t = this.ctx.currentTime + startTime;
     

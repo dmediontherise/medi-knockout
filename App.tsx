@@ -237,9 +237,7 @@ const App: React.FC = () => {
       {/* --- ROUND START (Ready... Fight!) --- */}
       {gameState === GameState.ROUND_START && (
           <div className="absolute inset-0 z-[55] flex items-center justify-center pointer-events-none">
-              <h1 className="text-8xl md:text-9xl font-retro text-yellow-400 animate-pulse drop-shadow-[0_0_30px_rgba(0,0,0,1)] stroke-black tracking-widest">
-                  READY...
-              </h1>
+              {/* We rely on the HUD feedback message, or we can duplicate it here for emphasis */}
           </div>
       )}
 
