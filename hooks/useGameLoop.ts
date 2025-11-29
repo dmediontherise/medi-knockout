@@ -27,6 +27,10 @@ export const useGameLoop = () => {
   const playerActionEndTime = useRef<number>(0);
   const opponentActionEndTime = useRef<number>(0);
   
+  // Timer Refs
+  const victoryTimeout = useRef<NodeJS.Timeout | null>(null);
+  const gameOverTimeout = useRef<NodeJS.Timeout | null>(null);
+
   // AI Specific Refs
   const aiQueue = useRef<string[]>([]); 
   const aiNextDecisionTime = useRef<number>(0);
@@ -53,6 +57,10 @@ export const useGameLoop = () => {
   };
 
   const resetGame = (nextOpponent = false) => {
+    // Clear any pending timeouts
+    if (victoryTimeout.current) clearTimeout(victoryTimeout.current);
+    if (gameOverTimeout.current) clearTimeout(gameOverTimeout.current);
+    
     // Initialize sound if not already
     soundEngine.init();
     soundEngine.resume();
@@ -100,7 +108,7 @@ export const useGameLoop = () => {
     const isTelegraphing = opponentState.current.toString().startsWith('TELEGRAPH');
     
     // Recovery Phase: After an action, go to Idle and set delay
-    if (opponentState.current !== OpponentAction.IDLE && !isTelegraphing) {
+    if (opponentState.current !== OpponentAction.IDLE && !isTelegraphing && opponentState.current !== OpponentAction.KO) {
       opponentState.current = OpponentAction.IDLE;
       
       const isCombos = aiQueue.current.length > 0;
@@ -308,7 +316,7 @@ export const useGameLoop = () => {
       playerState.current = PlayerAction.KO;
       triggerFeedback("KNOCKOUT!");
       soundEngine.playKO();
-      setTimeout(() => {
+      gameOverTimeout.current = setTimeout(() => {
         setGameState(GameState.GAME_OVER);
       }, 3000);
     }
@@ -463,7 +471,7 @@ export const useGameLoop = () => {
         opponentState.current = OpponentAction.KO;
         triggerFeedback("KNOCKOUT!");
         soundEngine.playKO(); // Victory Music
-        setTimeout(() => {
+        victoryTimeout.current = setTimeout(() => {
             setGameState(GameState.VICTORY);
         }, 3000);
     }
