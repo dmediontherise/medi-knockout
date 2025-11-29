@@ -7,6 +7,7 @@ import Controls from './components/Controls';
 import Background from './components/Background';
 import { GameState, PlayerAction } from './types';
 import { Trophy, Skull, Play, Info, AlertTriangle, RefreshCcw } from 'lucide-react';
+import { soundEngine } from './utils/sound';
 
 const App: React.FC = () => {
   const { 
@@ -23,6 +24,25 @@ const App: React.FC = () => {
     releaseBlock,
     resetGame
   } = useGameLoop();
+
+  // Ensure AudioContext is unlocked on first interaction
+  React.useEffect(() => {
+      const unlockAudio = () => {
+          soundEngine.init();
+          soundEngine.resume();
+          window.removeEventListener('click', unlockAudio);
+          window.removeEventListener('touchstart', unlockAudio);
+          window.removeEventListener('keydown', unlockAudio);
+      };
+      window.addEventListener('click', unlockAudio);
+      window.addEventListener('touchstart', unlockAudio);
+      window.addEventListener('keydown', unlockAudio);
+      return () => {
+          window.removeEventListener('click', unlockAudio);
+          window.removeEventListener('touchstart', unlockAudio);
+          window.removeEventListener('keydown', unlockAudio);
+      };
+  }, []);
 
   // Calculate widths for health bars
   const playerHealthPercent = (playerStats.hp / playerStats.maxHp) * 100;

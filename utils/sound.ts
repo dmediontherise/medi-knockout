@@ -12,9 +12,13 @@ export class SoundEngine {
     this.ctx = new AudioContextClass();
     
     this.masterGain = this.ctx.createGain();
-    this.masterGain.gain.value = 0.2; // Master Volume
+    this.masterGain.gain.value = 0.5; // Increased Master Volume
     this.masterGain.connect(this.ctx.destination);
     
+    if (this.ctx.state === 'suspended') {
+        this.ctx.resume();
+    }
+
     this.initialized = true;
   }
 
