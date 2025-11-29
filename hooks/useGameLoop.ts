@@ -99,11 +99,17 @@ export const useGameLoop = () => {
     
     specialStatus.current = { invertedUntil: 0, bigLieUntil: 0, doubleDamageUntil: 0, speedBoostUntil: 0 };
 
-    setGameState(GameState.PLAYING);
-    setFeedbackMessage(`VS ${opp.name}`);
+    setGameState(GameState.ENTRANCE);
     
-    // Play Start Jingle
-    setTimeout(() => soundEngine.playStart(), 500);
+    // Play Entrance Theme & Announce
+    soundEngine.playEntrance(opp.id);
+
+    // Transition to Fight after entrance
+    setTimeout(() => {
+        setGameState(GameState.PLAYING);
+        setFeedbackMessage("FIGHT!");
+        soundEngine.playStart();
+    }, 4000);
   };
 
   // --- AI Logic ---

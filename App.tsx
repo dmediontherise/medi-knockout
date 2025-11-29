@@ -173,6 +173,41 @@ const App: React.FC = () => {
         </div>
       )}
 
+      {/* --- ENTRANCE SCREEN --- */}
+      {gameState === GameState.ENTRANCE && (
+        <div className="absolute inset-0 bg-slate-950 z-[60] flex flex-col items-center justify-center overflow-hidden">
+            {/* Background Flash */}
+            <div className="absolute inset-0 bg-red-900/20 animate-pulse"></div>
+            
+            {/* Animated Stripes */}
+            <div className="absolute inset-0 bg-[linear-gradient(45deg,transparent_25%,rgba(255,255,255,0.05)_25%,rgba(255,255,255,0.05)_50%,transparent_50%,transparent_75%,rgba(255,255,255,0.05)_75%,rgba(255,255,255,0.05)_100%)] bg-[size:40px_40px] opacity-20"></div>
+
+            {/* VS Text */}
+            <h2 className="text-9xl font-retro text-white italic -skew-x-12 drop-shadow-[0_0_20px_rgba(255,0,0,0.8)] animate-bounce mb-8 z-10">VS</h2>
+
+            {/* Opponent Info */}
+            <div className="flex flex-col items-center z-10 animate-in fade-in zoom-in duration-700">
+                <h1 className="text-5xl md:text-7xl text-red-500 font-retro uppercase tracking-widest drop-shadow-lg mb-2">{currentOpponent.name}</h1>
+                <p className="text-xl text-slate-300 font-mono bg-black/50 px-4 py-1 rounded mb-8">"{currentOpponent.description}"</p>
+                
+                {/* Large Portrait (Uses the sprite sheet, cropped to face if possible, or just scaled) */}
+                <div className="relative w-64 h-64 border-4 border-red-600 rounded-full overflow-hidden shadow-[0_0_50px_rgba(220,38,38,0.5)] bg-slate-800">
+                     {/* We reuse the sprite sheet but just show the idle frame (0,0) roughly */}
+                     <div 
+                        className="w-[400%] h-[100%]"
+                        style={{
+                            backgroundImage: `url(${currentOpponent.spriteConfig.sheetUrl})`,
+                            backgroundPosition: '0 0', // Idle Frame
+                            backgroundSize: '400% 100%',
+                            transform: 'scale(1.5) translateY(20px)', // Zoom in on face
+                            imageRendering: 'pixelated'
+                        }}
+                     ></div>
+                </div>
+            </div>
+        </div>
+      )}
+
       {gameState === GameState.VICTORY && (
         <div className="absolute inset-0 bg-green-900/90 z-[60] flex flex-col items-center justify-center animate-fade-in text-center backdrop-blur-sm p-4">
              <Trophy size={80} className="text-yellow-400 mb-4 animate-bounce drop-shadow-[0_0_30px_rgba(255,215,0,0.8)]" />

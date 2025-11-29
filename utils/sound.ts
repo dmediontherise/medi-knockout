@@ -59,12 +59,12 @@ export class SoundEngine {
     return buffer;
   }
 
-  private playNoise(duration: number, filterFreq: number = 1000, volume: number = 0.1) {
+  private playNoise(duration: number, filterFreq: number = 1000, volume: number = 0.1, startTime: number = 0) {
       if (!this.ctx || !this.masterGain) return;
       const buffer = this.createNoiseBuffer();
       if (!buffer) return;
 
-      const t = this.ctx.currentTime;
+      const t = this.ctx.currentTime + startTime;
       const source = this.ctx.createBufferSource();
       source.buffer = buffer;
       
@@ -186,11 +186,58 @@ export class SoundEngine {
 
   playStart() {
       // 8-bit "Round Start" Jingle
-      const t = 0;
+      const t = this.ctx?.currentTime || 0;
       this.playTone(440, 'square', 0.1, t);       // A4
       this.playTone(554, 'square', 0.1, t + 0.1); // C#5
       this.playTone(659, 'square', 0.1, t + 0.2); // E5
       this.playTone(880, 'square', 0.4, t + 0.3); // A5
+  }
+
+  playEntrance(characterId: string) {
+      if (!this.ctx) return;
+      const t = this.ctx.currentTime; // We don't actually use this var in playTone since it adds to current time internally, but logic below assumes offset from NOW.
+      // Correction: playTone adds `startTime` to `this.ctx.currentTime`. So passing 0 plays now.
+
+      // 1. Announcer "Voice" (Low rumble)
+      this.playNoise(1.5, 300, 0.15, 0); 
+      
+      // 2. Character Theme
+      switch (characterId) {
+          case 'aint_man':
+              // Heavy Stomp: Low C -> G -> C
+              this.playTone(65.41, 'square', 0.4, 0.5);
+              this.playTone(65.41, 'square', 0.4, 1.0);
+              this.playTone(98.00, 'sawtooth', 0.4, 1.5);
+              this.playTone(65.41, 'square', 0.8, 2.0);
+              break;
+          case 'medi_jinx':
+              // Fast Annoying High Pitch: C6 -> D6 -> E6
+              for(let i=0; i<8; i++) {
+                  this.playTone(1046.5 + (i*100), 'triangle', 0.1, 0.5 + (i*0.15));
+              }
+              break;
+          case 'dj_tito':
+              // Dance Beat: Bass Kick + High Hat pattern
+              for(let i=0; i<4; i++) {
+                  this.playTone(60, 'sine', 0.1, 0.5 + i*0.5, 0.3); // Kick
+                  // Hat off-beat
+                  this.playNoise(0.05, 4000, 0.05, 0.5 + i*0.5 + 0.25); 
+              }
+              break;
+          case 'mr_yankee':
+              // Stadium Organ: Charge!
+              this.playTone(392.00, 'sawtooth', 0.2, 0.5); // G4
+              this.playTone(523.25, 'sawtooth', 0.2, 0.8); // C5
+              this.playTone(659.25, 'sawtooth', 0.2, 1.1); // E5
+              this.playTone(783.99, 'sawtooth', 0.6, 1.4); // G5
+              break;
+          case 'maga_man':
+              // Dark March: Low Brass
+              this.playTone(110.00, 'sawtooth', 0.6, 0.5); // A2
+              this.playTone(110.00, 'sawtooth', 0.6, 1.2); // A2
+              this.playTone(130.81, 'sawtooth', 0.6, 1.9); // C3
+              break;
+      }
   }
 
   playKO() {
