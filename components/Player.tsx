@@ -109,10 +109,10 @@ const Player: React.FC<PlayerProps> = ({ state }) => {
         
         {/* Head */}
         <g>
-            <circle cx={headPos.cx} cy={headPos.cy} r="18" className="fill-slate-900/80" />
+            <circle cx={headPos.cx} cy={headPos.cy} r="18" className="fill-slate-900/80 transition-all duration-100 ease-linear" />
             {/* Grid lines on head to show rotation */}
-            <path d={`M${headPos.cx-18} ${headPos.cy} Q${headPos.cx} ${headPos.cy+5} ${headPos.cx+18} ${headPos.cy}`} strokeOpacity="0.5" />
-            <path d={`M${headPos.cx} ${headPos.cy-18} Q${headPos.cx+torsoTwist/2} ${headPos.cy} ${headPos.cx} ${headPos.cy+18}`} strokeOpacity="0.5" />
+            <path d={`M${headPos.cx-18} ${headPos.cy} Q${headPos.cx} ${headPos.cy+5} ${headPos.cx+18} ${headPos.cy}`} strokeOpacity="0.5" className="transition-all duration-100 ease-linear" />
+            <path d={`M${headPos.cx} ${headPos.cy-18} Q${headPos.cx+torsoTwist/2} ${headPos.cy} ${headPos.cx} ${headPos.cy+18}`} strokeOpacity="0.5" className="transition-all duration-100 ease-linear" />
             
             {/* Player Impact Starburst */}
             {isHit && (
@@ -130,20 +130,20 @@ const Player: React.FC<PlayerProps> = ({ state }) => {
 
         {/* Torso */}
         {/* Trapezoid shape that twists */}
-        <path d={`M${L_SHOULDER.x} ${L_SHOULDER.y} L${R_SHOULDER.x} ${R_SHOULDER.y} L${100 - torsoTwist} 180 L${50 - torsoTwist} 180 Z`} className="fill-slate-900/80" />
+        <path d={`M${L_SHOULDER.x} ${L_SHOULDER.y} L${R_SHOULDER.x} ${R_SHOULDER.y} L${100 - torsoTwist} 180 L${50 - torsoTwist} 180 Z`} className="fill-slate-900/80 transition-all duration-100 ease-linear" />
         {/* Spine */}
-        <path d={`M${75 + torsoTwist} 70 L${75 - torsoTwist} 180`} strokeDasharray="3 3" strokeOpacity="0.5" />
+        <path d={`M${75 + torsoTwist} 70 L${75 - torsoTwist} 180`} strokeDasharray="3 3" strokeOpacity="0.5" className="transition-all duration-100 ease-linear" />
 
         {/* -- Arms (Calculated Paths) -- */}
         {/* Left Arm: Shoulder -> Elbow -> Hand */}
-        <path d={`M${L_SHOULDER.x} ${L_SHOULDER.y} Q${lElbow.x} ${lElbow.y} ${lHand.x} ${lHand.y}`} strokeWidth="6" strokeLinecap="round" />
+        <path d={`M${L_SHOULDER.x} ${L_SHOULDER.y} Q${lElbow.x} ${lElbow.y} ${lHand.x} ${lHand.y}`} strokeWidth="6" strokeLinecap="round" className="transition-all duration-100 ease-linear" />
         
         {/* Right Arm: Shoulder -> Elbow -> Hand */}
-        <path d={`M${R_SHOULDER.x} ${R_SHOULDER.y} Q${rElbow.x} ${rElbow.y} ${rHand.x} ${rHand.y}`} strokeWidth="6" strokeLinecap="round" />
+        <path d={`M${R_SHOULDER.x} ${R_SHOULDER.y} Q${rElbow.x} ${rElbow.y} ${rHand.x} ${rHand.y}`} strokeWidth="6" strokeLinecap="round" className="transition-all duration-100 ease-linear" />
 
         {/* -- Gloves (Rendered last to be on top) -- */}
-        <circle cx={lHand.x} cy={lHand.y} r="16" className={`${gloveFill} ${gloveStroke} transition-all duration-75`} />
-        <circle cx={rHand.x} cy={rHand.y} r="16" className={`${gloveFill} ${gloveStroke} transition-all duration-75`} />
+        <circle cx={lHand.x} cy={lHand.y} r="16" className={`${gloveFill} ${gloveStroke} transition-all duration-100 ease-linear`} />
+        <circle cx={rHand.x} cy={rHand.y} r="16" className={`${gloveFill} ${gloveStroke} transition-all duration-100 ease-linear`} />
 
         {/* -- Visual Feedback: Punch Connect / Impact -- */}
         {state.toString().includes('PUNCH') && (

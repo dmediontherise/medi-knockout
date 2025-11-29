@@ -176,14 +176,14 @@ const Opponent: React.FC<OpponentProps> = ({ state, character, lastHitType }) =>
       
       return (
           <g>
-              <path d={`M${hipLX} ${hipY} Q${lKnee.x} ${lKnee.y} ${lFoot.x} ${lFoot.y}`} stroke={color} strokeWidth={strokeW} fill="none" strokeLinecap="round" />
-              <path d={`M${hipRX} ${hipY} Q${rKnee.x} ${rKnee.y} ${rFoot.x} ${rFoot.y}`} stroke={color} strokeWidth={strokeW} fill="none" strokeLinecap="round" />
+              <path d={`M${hipLX} ${hipY} Q${lKnee.x} ${lKnee.y} ${lFoot.x} ${lFoot.y}`} stroke={color} strokeWidth={strokeW} fill="none" strokeLinecap="round" className="transition-all duration-100 ease-linear" />
+              <path d={`M${hipRX} ${hipY} Q${rKnee.x} ${rKnee.y} ${rFoot.x} ${rFoot.y}`} stroke={color} strokeWidth={strokeW} fill="none" strokeLinecap="round" className="transition-all duration-100 ease-linear" />
               
-              <path d={`M${lFoot.x-15} ${lFoot.y} L${lFoot.x+15} ${lFoot.y} L${lFoot.x+15} ${lFoot.y+15} L${lFoot.x-15} ${lFoot.y+15} Z`} fill={shoeColor} />
-              <path d={`M${rFoot.x-15} ${rFoot.y} L${rFoot.x+15} ${rFoot.y} L${rFoot.x+15} ${rFoot.y+15} L${rFoot.x-15} ${rFoot.y+15} Z`} fill={shoeColor} />
+              <path d={`M${lFoot.x-15} ${lFoot.y} L${lFoot.x+15} ${lFoot.y} L${lFoot.x+15} ${lFoot.y+15} L${lFoot.x-15} ${lFoot.y+15} Z`} fill={shoeColor} className="transition-all duration-100 ease-linear" />
+              <path d={`M${rFoot.x-15} ${rFoot.y} L${rFoot.x+15} ${rFoot.y} L${rFoot.x+15} ${rFoot.y+15} L${rFoot.x-15} ${rFoot.y+15} Z`} fill={shoeColor} className="transition-all duration-100 ease-linear" />
 
               {pantsType === 'shorts' && (
-                  <path d={`M-45 ${hipY} L45 ${hipY} L55 ${hipY+35} L-55 ${hipY+35} Z`} fill={color} />
+                  <path d={`M-45 ${hipY} L45 ${hipY} L55 ${hipY+35} L-55 ${hipY+35} Z`} fill={color} className="transition-all duration-100 ease-linear" />
               )}
           </g>
       );
@@ -237,6 +237,7 @@ const Opponent: React.FC<OpponentProps> = ({ state, character, lastHitType }) =>
             stroke="black"
             strokeWidth="1"
             opacity="0.95"
+            style={{ transition: 'd 0.1s linear' }}
           />
       );
   };
@@ -260,9 +261,9 @@ const Opponent: React.FC<OpponentProps> = ({ state, character, lastHitType }) =>
                    <rect x="-40" y="40" width="80" height="60" fill="#DC2626" rx="10" /> 
                    <text x="0" y="75" fontSize="20" textAnchor="middle" fill="black" fontWeight="bold" transform="rotate(-10)">28-3</text>
                    
-                   <g transform={`translate(${pose.head.x}, ${pose.head.y}) rotate(${pose.head.r})`}>
+                   <g transform={`translate(${pose.head.x}, ${pose.head.y}) rotate(${pose.head.r})`} className="transition-transform duration-100 ease-linear">
                        <circle cx="0" cy="0" r="40" fill="#60A5FA" />
-                       <g transform={isHit ? "translate(0, -30) rotate(-20)" : ""}>
+                       <g transform={isHit ? "translate(0, -30) rotate(-20)" : ""} className="transition-transform duration-75">
                             <path d="M-40 0 Q0 10 40 0 V-45 H-40 Z" fill="#1F2937" /> 
                        </g>
                        {isHit ? (
@@ -291,9 +292,9 @@ const Opponent: React.FC<OpponentProps> = ({ state, character, lastHitType }) =>
                     <rect x="-15" y="10" width="30" height="40" fill={neckColor} /> {/* Neck */}
                     <path d="M-45 40 L45 40 L40 100 L-40 100 Z" fill="#1F2937" />
                     <circle cx="0" cy="65" r="12" fill="#FBBF24" opacity="0.5" />
-                    <g transform={`translate(${pose.head.x}, ${pose.head.y}) rotate(${pose.head.r})`}>
+                    <g transform={`translate(${pose.head.x}, ${pose.head.y}) rotate(${pose.head.r})`} className="transition-transform duration-100 ease-linear">
                         <circle cx="0" cy="0" r="38" fill="#A97142" />
-                        <g transform={isHit ? "translate(-20, -10) rotate(-30)" : ""}>
+                        <g transform={isHit ? "translate(-20, -10) rotate(-30)" : ""} className="transition-transform duration-75">
                              <rect x="-48" y="-15" width="12" height="35" fill="#9CA3AF" rx="2" />
                         </g>
                         <g transform={isHit ? "translate(20, -10) rotate(30)" : ""}>
@@ -319,7 +320,7 @@ const Opponent: React.FC<OpponentProps> = ({ state, character, lastHitType }) =>
                     <rect x="-18" y="10" width="36" height="40" fill={neckColor} /> {/* Neck */}
                     <rect x="-50" y="40" width="100" height="80" fill="#F8FAFC" stroke="#1E293B" strokeWidth="2"/>
                     <path d="M-30 40 V120 M-10 40 V120 M10 40 V120 M30 40 V120" stroke="#1E293B" strokeWidth="2" />
-                    <g transform={`translate(${pose.head.x}, ${pose.head.y}) rotate(${pose.head.r})`}>
+                    <g transform={`translate(${pose.head.x}, ${pose.head.y}) rotate(${pose.head.r})`} className="transition-transform duration-100 ease-linear">
                         <circle cx="0" cy="0" r="45" fill="white" stroke="#CBD5E1" strokeWidth="1"/>
                         <path d="M-28 -28 Q0 -5 28 -28" stroke="#EF4444" strokeWidth={isHit ? 6 : 3} fill="none" strokeDasharray={isHit ? "10 5" : "4 2"}/>
                         <path d="M-28 28 Q0 5 28 28" stroke="#EF4444" strokeWidth={isHit ? 6 : 3} fill="none" strokeDasharray={isHit ? "10 5" : "4 2"}/>
@@ -350,9 +351,9 @@ const Opponent: React.FC<OpponentProps> = ({ state, character, lastHitType }) =>
                     <path d="M-50 40 L50 40 L45 120 L-45 120 Z" fill="#1E3A8A" />
                     <path d="M0 40 L0 120" stroke="white" strokeWidth="25" />
                     <path d="M0 40 L8 110 L0 120 L-8 110 Z" fill="#DC2626" />
-                    <g transform={`translate(${pose.head.x}, ${pose.head.y}) rotate(${pose.head.r})`}>
+                    <g transform={`translate(${pose.head.x}, ${pose.head.y}) rotate(${pose.head.r})`} className="transition-transform duration-100 ease-linear">
                         <circle cx="0" cy="0" r="40" fill={isHit ? "#EF4444" : "#FB923C"} />
-                        <g transform={isHit ? "rotate(-45) translate(-10,-10)" : ""}>
+                        <g transform={isHit ? "rotate(-45) translate(-10,-10)" : ""} className="transition-transform duration-75">
                             <path d="M-40 -15 L40 -15 L35 -40 L-35 -40 Z" fill="#DC2626" />
                             <rect x="-42" y="-15" width="84" height="6" fill="#DC2626" />
                             <text x="0" y="-22" fontSize="10" textAnchor="middle" fill="white">MAGA</text>
@@ -385,9 +386,9 @@ const Opponent: React.FC<OpponentProps> = ({ state, character, lastHitType }) =>
                     
                     <path d="M-50 40 L50 40 L40 110 L-40 110 Z" fill="#000000" />
                     <path d="M-40 40 L0 110 L40 40" fill="none" stroke="#FBBF24" strokeWidth="5" />
-                    <g transform={`translate(${pose.head.x}, ${pose.head.y}) rotate(${pose.head.r})`}>
+                    <g transform={`translate(${pose.head.x}, ${pose.head.y}) rotate(${pose.head.r})`} className="transition-transform duration-100 ease-linear">
                         <circle cx="0" cy="0" r="40" fill="#A97142" />
-                        <g transform={isHit ? "rotate(10) translate(0, -5)" : ""}>
+                        <g transform={isHit ? "rotate(10) translate(0, -5)" : ""} className="transition-transform duration-75">
                              <rect x="-40" y="-35" width="80" height="25" fill="#FBBF24" rx="5" />
                              <rect x="-6" y="-35" width="12" height="25" fill="black" />
                         </g>
