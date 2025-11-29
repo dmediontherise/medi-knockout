@@ -133,12 +133,12 @@ const App: React.FC = () => {
           <div className="absolute bottom-[-10%] w-full h-[60%] bg-[linear-gradient(rgba(0,255,100,0.1)_1px,transparent_1px),linear-gradient(90deg,rgba(0,255,100,0.1)_1px,transparent_1px)] bg-[size:50px_50px] [transform:perspective(600px)_rotateX(60deg)] origin-bottom pointer-events-none z-10 opacity-30"></div>
 
           {/* Opponent Layer */}
-          <div className={`transition-all duration-75 z-20 origin-bottom translate-y-[20%] transform scale-[1.4] md:scale-[1.8]`}>
+          <div className={`transition-all duration-75 z-20 origin-bottom translate-y-[35%] transform scale-[1.25] md:scale-[1.8]`}>
              <Opponent state={opponentState} character={currentOpponent} lastHitType={lastHitType} />
           </div>
 
           {/* Player Layer */}
-          <div className="absolute bottom-[-5vh] z-30 origin-bottom scale-100 md:scale-125 pointer-events-none mix-blend-screen opacity-90">
+          <div className="absolute bottom-[-8vh] z-30 origin-bottom scale-95 md:scale-125 pointer-events-none mix-blend-screen opacity-90">
              <Player state={playerState} />
           </div>
       </div>
