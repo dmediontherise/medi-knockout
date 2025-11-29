@@ -116,6 +116,9 @@ export const useGameLoop = () => {
              setGameState(GameState.PLAYING);
              setFeedbackMessage("FIGHT!");
              soundEngine.playFight();
+             
+             // Give player 500ms head start before AI acts
+             aiNextDecisionTime.current = Date.now() + 500;
         }, 2000);
     }, 4000);
   };
