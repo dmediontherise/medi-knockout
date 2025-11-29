@@ -188,6 +188,21 @@ export class SoundEngine {
       source.stop(t + duration);
   }
 
+  playReady() {
+      if (!this.ctx) return;
+      // "READY..." (Two rising tones)
+      this.playTone(300, 'square', 0.1, 0);
+      this.playTone(400, 'square', 0.3, 0.2);
+  }
+
+  playFight() {
+      if (!this.ctx) return;
+      // "FIGHT!" (Crash / High Chord)
+      this.playTone(600, 'sawtooth', 0.1, 0);
+      this.playTone(800, 'square', 0.4, 0);
+      this.playNoise(0.5, 2000, 0.2); // Crash
+  }
+
   playStart() {
       // 8-bit "Round Start" Jingle
       const t = this.ctx?.currentTime || 0;

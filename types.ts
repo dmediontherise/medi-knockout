@@ -2,6 +2,7 @@
 export enum GameState {
   MENU,
   ENTRANCE,
+  ROUND_START,
   PLAYING,
   GAME_OVER,
   VICTORY

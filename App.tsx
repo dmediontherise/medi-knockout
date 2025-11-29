@@ -210,8 +210,14 @@ const App: React.FC = () => {
                 <h1 className="text-5xl md:text-7xl text-red-500 font-retro uppercase tracking-widest drop-shadow-lg mb-2">{currentOpponent.name}</h1>
                 <p className="text-xl text-slate-300 font-mono bg-black/50 px-4 py-1 rounded mb-8">"{currentOpponent.description}"</p>
                 
-                {/* Large Portrait (Uses the sprite sheet, cropped to face if possible, or just scaled) */}
-                <div className="relative w-64 h-64 border-4 border-red-600 rounded-full overflow-hidden shadow-[0_0_50px_rgba(220,38,38,0.5)] bg-slate-800">
+                {/* Large Portrait - Slide Up Animation */}
+                <div className="relative w-64 h-64 border-4 border-red-600 rounded-full overflow-hidden shadow-[0_0_50px_rgba(220,38,38,0.5)] bg-slate-800 animate-[slide-up_1s_ease-out_forwards]">
+                     <style>{`
+                        @keyframes slide-up {
+                            0% { transform: translateY(100%) scale(0.5); opacity: 0; }
+                            100% { transform: translateY(0) scale(1); opacity: 1; }
+                        }
+                     `}</style>
                      {/* We reuse the sprite sheet but just show the idle frame (0,0) roughly */}
                      <div 
                         className="w-[400%] h-[100%]"
@@ -226,6 +232,15 @@ const App: React.FC = () => {
                 </div>
             </div>
         </div>
+      )}
+
+      {/* --- ROUND START (Ready... Fight!) --- */}
+      {gameState === GameState.ROUND_START && (
+          <div className="absolute inset-0 z-[55] flex items-center justify-center pointer-events-none">
+              <h1 className="text-8xl md:text-9xl font-retro text-yellow-400 animate-pulse drop-shadow-[0_0_30px_rgba(0,0,0,1)] stroke-black tracking-widest">
+                  READY...
+              </h1>
+          </div>
       )}
 
       {gameState === GameState.VICTORY && (

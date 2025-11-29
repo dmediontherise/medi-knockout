@@ -104,11 +104,17 @@ export const useGameLoop = () => {
     // Play Entrance Theme & Announce
     soundEngine.playEntrance(opp.id);
 
-    // Transition to Fight after entrance
+    // Transition to Round Start (Ready... Fight!)
     setTimeout(() => {
-        setGameState(GameState.PLAYING);
-        setFeedbackMessage("FIGHT!");
-        soundEngine.playStart();
+        setGameState(GameState.ROUND_START);
+        soundEngine.playReady();
+        
+        // Delay for "FIGHT!"
+        setTimeout(() => {
+             setGameState(GameState.PLAYING);
+             setFeedbackMessage("FIGHT!");
+             soundEngine.playFight();
+        }, 2000);
     }, 4000);
   };
 
