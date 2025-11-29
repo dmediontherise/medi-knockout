@@ -6,6 +6,9 @@ export default defineConfig(({ mode }) => {
     const env = loadEnv(mode, '.', '');
     return {
       base: '/medi-knockout/',
+      build: {
+        target: 'es2015',
+      },
       server: {
         port: 3000,
         host: '0.0.0.0',

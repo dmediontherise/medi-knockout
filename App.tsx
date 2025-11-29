@@ -72,7 +72,7 @@ const App: React.FC = () => {
       <div className="w-full max-w-4xl p-4 flex justify-between items-start z-50 font-retro text-xs md:text-sm absolute top-0 left-1/2 -translate-x-1/2">
         {/* Player Stats */}
         <div className="flex flex-col gap-1 w-1/3">
-          <div className="text-green-400 drop-shadow-md">LIL TANK</div>
+          <div className="text-green-400 drop-shadow-md">MEDI</div>
           <div className="h-6 w-full bg-slate-800 border-2 border-slate-600 relative skew-x-[-10deg]">
              <div 
                className="h-full bg-gradient-to-r from-green-600 to-green-400 transition-all duration-200 ease-out" 
@@ -148,7 +148,7 @@ const App: React.FC = () => {
       {gameState === GameState.MENU && (
         <div className="absolute inset-0 bg-slate-900/95 z-50 flex flex-col items-center justify-center gap-6 text-center p-4">
             <h1 className="text-5xl md:text-7xl text-green-400 font-retro animate-pulse drop-shadow-[0_0_15px_rgba(0,255,0,0.8)] tracking-tighter">
-                LIL TANK'S<br/>KNOCKOUT
+                MEDI<br/>KNOCKOUT 2D
             </h1>
             <div className="border-4 border-green-500 p-8 rounded-lg bg-slate-800/80 max-w-lg backdrop-blur-md shadow-2xl">
                 <p className="mb-6 text-green-300 font-bold flex items-center justify-center gap-2 text-xl font-retro"><Info size={24}/> HOW TO FIGHT</p>
