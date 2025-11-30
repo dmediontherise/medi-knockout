@@ -94,7 +94,7 @@ const App: React.FC = () => {
       )}
 
       {/* --- HUD --- */}
-      <div className="w-full max-w-4xl p-2 pt-safe-top flex justify-between items-start z-50 font-retro text-[10px] md:text-sm absolute top-0 left-1/2 -translate-x-1/2 pointer-events-none">
+      <div className="w-full max-w-4xl p-2 pt-[env(safe-area-inset-top)] flex justify-between items-start z-50 font-retro text-[10px] md:text-sm absolute top-0 left-1/2 -translate-x-1/2 pointer-events-none">
         {/* Player Stats */}
         <div className="flex flex-col gap-1 w-[40%]">
           <div className="text-green-400 drop-shadow-md flex justify-between"><span>MEDI</span> <span>LVL 1</span></div>
@@ -270,7 +270,7 @@ const App: React.FC = () => {
       )}
 
       {/* --- Controls Area (Bottom 35%) --- */}
-      <div className="w-full h-[35%] min-h-[220px] bg-slate-950 border-t-4 border-slate-700 relative z-50 flex-shrink-0 pb-safe-bottom">
+      <div className="w-full h-[35%] min-h-[220px] bg-slate-950 border-t-4 border-slate-700 relative z-50 flex-shrink-0 pb-[env(safe-area-inset-bottom)]">
           {gameState === GameState.PLAYING && (
              <Controls onAction={handlePlayerInput} onReleaseBlock={releaseBlock} />
           )}
