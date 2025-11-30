@@ -9,8 +9,6 @@ interface ControlsProps {
 
 const Controls: React.FC<ControlsProps> = ({ onAction, onReleaseBlock }) => {
   const pressedKeys = useRef<Set<string>>(new Set());
-  // We still need a way to toggle Head mode if the user holds UP, 
-  // but since we are bringing back arrow keys, we can map the UP button to a toggle or hold state.
   const [isUpHeld, setIsUpHeld] = useState(false);
 
   const determineAction = (keys: Set<string>): PlayerAction | null => {
@@ -24,10 +22,6 @@ const Controls: React.FC<ControlsProps> = ({ onAction, onReleaseBlock }) => {
     if (isDown) return PlayerAction.BLOCK;
     if (isLeft) return PlayerAction.DODGE_LEFT;
     if (isRight) return PlayerAction.DODGE_RIGHT;
-
-    // Note: Up itself doesn't trigger an action, it modifies punches.
-    // But if we just press Up, maybe we want to visualize it? 
-    // For now, logic stays: Up + Punch = Head Punch.
 
     if (isPunchLeft) return isUp ? PlayerAction.PUNCH_LEFT_HEAD : PlayerAction.PUNCH_LEFT_BODY;
     if (isPunchRight) return isUp ? PlayerAction.PUNCH_RIGHT_HEAD : PlayerAction.PUNCH_RIGHT_BODY;
@@ -57,86 +51,92 @@ const Controls: React.FC<ControlsProps> = ({ onAction, onReleaseBlock }) => {
     };
   }, [onAction, onReleaseBlock, isUpHeld]);
 
-  // Prevent default touch behavior helper
-  const prevent = (e: React.TouchEvent) => {
-    // e.preventDefault(); // We handle this in individual handlers now to be safe
+  // Helper to prevent default touch actions
+  const handleTouch = (e: React.TouchEvent, action: () => void) => {
+    if (e.cancelable) e.preventDefault();
+    action();
   };
 
-  const btnBase = "relative flex items-center justify-center rounded-xl shadow-[0_4px_0_rgba(0,0,0,0.5)] active:shadow-none active:translate-y-1 transition-all border-2 touch-none select-none cursor-pointer active:bg-opacity-80";
-  const btnGray = "bg-slate-700 border-slate-600 text-slate-200";
+  const btnBase = "relative flex items-center justify-center rounded-2xl shadow-[0_4px_0_rgba(0,0,0,0.5)] active:shadow-none active:translate-y-1 transition-all border-2 touch-none select-none cursor-pointer active:bg-opacity-80";
+  const btnGray = "bg-slate-700 border-slate-500 text-slate-200";
   const btnRed = "bg-red-800 border-red-600 text-white";
   
-  // Dynamic styling for UP button to show it's active (Head Mode)
   const btnUpStyle = isUpHeld 
-    ? "bg-yellow-600 border-yellow-400 text-white shadow-[0_0_10px_rgba(234,179,8,0.5)]" 
+    ? "bg-yellow-600 border-yellow-400 text-white shadow-[0_0_15px_rgba(234,179,8,0.5)]" 
     : btnGray;
 
+  // Responsive sizes using VW for optimal mobile portrait fit
+  // D-Pad Area: ~50% width
+  // Action Area: ~45% width
+  // Buttons: ~16-18vw (approx 60-70px on generic phone)
+  
   return (
-    <div className="w-full h-full flex justify-between items-end px-4 pb-4 gap-8 pointer-events-auto select-none touch-none max-w-[800px] mx-auto">
+    <div className="w-full h-full flex justify-between items-end px-2 pb-4 pointer-events-auto select-none touch-none max-w-[800px] mx-auto">
       
-      {/* LEFT SIDE: WIDE D-PAD */}
-      <div className="relative w-48 h-48 flex items-center justify-center">
+      {/* LEFT SIDE: EXPANDED D-PAD */}
+      {/* Using explicit dimensions to ensure spacing */}
+      <div className="relative w-[50vw] h-[50vw] max-w-[240px] max-h-[240px] flex-shrink-0">
          {/* UP (Head Aim) */}
          <button 
-            className={`${btnBase} ${btnUpStyle} w-16 h-16 absolute top-0 left-1/2 -translate-x-1/2`}
-            onTouchStart={(e) => { e.preventDefault(); setIsUpHeld(true); }}
-            onTouchEnd={(e) => { e.preventDefault(); setIsUpHeld(false); }}
+            className={`${btnBase} ${btnUpStyle} w-[16vw] h-[16vw] max-w-[80px] max-h-[80px] absolute top-0 left-1/2 -translate-x-1/2`}
+            onTouchStart={(e) => handleTouch(e, () => setIsUpHeld(true))}
+            onTouchEnd={(e) => handleTouch(e, () => setIsUpHeld(false))}
             onMouseDown={() => setIsUpHeld(true)}
             onMouseUp={() => setIsUpHeld(false)}
             onMouseLeave={() => setIsUpHeld(false)}
          >
-            <ChevronUp size={32} />
-            <span className="absolute -top-4 text-[8px] font-bold text-yellow-400 tracking-widest">HEAD</span>
+            <ChevronUp className="w-8 h-8 md:w-10 md:h-10" />
+            <span className="absolute -top-5 text-[10px] font-bold text-yellow-400 tracking-widest drop-shadow-md">HEAD</span>
          </button>
 
-         {/* LEFT (Dodge) - Moved further left for "Wider" feel */}
+         {/* LEFT (Dodge) */}
          <button 
-            className={`${btnBase} ${btnGray} w-16 h-16 absolute left-0 top-1/2 -translate-y-1/2`}
-            onTouchStart={(e) => { e.preventDefault(); onAction(PlayerAction.DODGE_LEFT); }}
+            className={`${btnBase} ${btnGray} w-[16vw] h-[16vw] max-w-[80px] max-h-[80px] absolute left-0 top-1/2 -translate-y-1/2`}
+            onTouchStart={(e) => handleTouch(e, () => onAction(PlayerAction.DODGE_LEFT))}
          >
-            <ChevronLeft size={32}/>
+            <ChevronLeft className="w-8 h-8 md:w-10 md:h-10"/>
          </button>
 
-         {/* RIGHT (Dodge) - Moved further right */}
+         {/* RIGHT (Dodge) */}
          <button 
-            className={`${btnBase} ${btnGray} w-16 h-16 absolute right-0 top-1/2 -translate-y-1/2`}
-            onTouchStart={(e) => { e.preventDefault(); onAction(PlayerAction.DODGE_RIGHT); }}
+            className={`${btnBase} ${btnGray} w-[16vw] h-[16vw] max-w-[80px] max-h-[80px] absolute right-0 top-1/2 -translate-y-1/2`}
+            onTouchStart={(e) => handleTouch(e, () => onAction(PlayerAction.DODGE_RIGHT))}
          >
-            <ChevronRight size={32}/>
+            <ChevronRight className="w-8 h-8 md:w-10 md:h-10"/>
          </button>
 
          {/* DOWN (Block) */}
          <button 
-            className={`${btnBase} ${btnGray} w-16 h-16 absolute bottom-0 left-1/2 -translate-x-1/2`}
-            onTouchStart={(e) => { e.preventDefault(); onAction(PlayerAction.BLOCK); }}
-            onTouchEnd={(e) => { e.preventDefault(); onReleaseBlock(); }}
+            className={`${btnBase} ${btnGray} w-[16vw] h-[16vw] max-w-[80px] max-h-[80px] absolute bottom-0 left-1/2 -translate-x-1/2`}
+            onTouchStart={(e) => handleTouch(e, () => onAction(PlayerAction.BLOCK))}
+            onTouchEnd={(e) => handleTouch(e, () => onReleaseBlock())}
          >
-             <ChevronDown size={32}/>
-             <span className="absolute -bottom-4 text-[8px] font-bold text-blue-400 tracking-widest">BLOCK</span>
+             <ChevronDown className="w-8 h-8 md:w-10 md:h-10"/>
+             <span className="absolute -bottom-5 text-[10px] font-bold text-blue-400 tracking-widest drop-shadow-md">BLOCK</span>
          </button>
          
-         {/* Center D-Pad Decor */}
-         <div className="w-6 h-6 bg-slate-800 rounded-full absolute z-[-1]"></div>
+         {/* Center Decor */}
+         <div className="w-4 h-4 bg-slate-800/50 rounded-full absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 pointer-events-none"></div>
       </div>
 
-      {/* RIGHT SIDE: ATTACKS */}
-      <div className="relative w-40 h-40 flex items-center justify-center rotate-12">
-         {/* Left Punch (Left Top) */}
+      {/* RIGHT SIDE: LARGE ACTION BUTTONS */}
+      <div className="relative w-[42vw] h-[42vw] max-w-[200px] max-h-[200px] flex-shrink-0 rotate-6 mb-4 mr-2">
+         {/* Left Punch (Top Left) */}
          <button 
-           className={`${btnBase} ${btnRed} w-20 h-20 rounded-full absolute left-0 top-2 border-4`}
-           onTouchStart={(e) => { e.preventDefault(); onAction(isUpHeld ? PlayerAction.PUNCH_LEFT_HEAD : PlayerAction.PUNCH_LEFT_BODY); }}
+           className={`${btnBase} ${btnRed} w-[20vw] h-[20vw] max-w-[90px] max-h-[90px] rounded-full absolute left-0 top-0 border-4`}
+           onTouchStart={(e) => handleTouch(e, () => onAction(isUpHeld ? PlayerAction.PUNCH_LEFT_HEAD : PlayerAction.PUNCH_LEFT_BODY))}
          >
-           <Swords size={28} className="rotate-90"/>
-           <span className="absolute bottom-2 text-[8px] font-bold opacity-70">L</span>
+           <Swords className="w-8 h-8 md:w-12 md:h-12 rotate-90"/>
+           <span className="absolute bottom-3 text-[10px] font-bold opacity-80">L</span>
          </button>
          
-         {/* Right Punch (Right Bottom) */}
+         {/* Right Punch (Bottom Right) */}
          <button 
-            className={`${btnBase} ${btnRed} w-20 h-20 rounded-full absolute right-0 bottom-2 border-4`}
-            onTouchStart={(e) => { e.preventDefault(); onAction(isUpHeld ? PlayerAction.PUNCH_RIGHT_HEAD : PlayerAction.PUNCH_RIGHT_BODY); }}
+            className={`${btnBase} ${btnRed} w-[20vw] h-[20vw] max-w-[90px] max-h-[90px] rounded-full absolute right-0 bottom-0 border-4`}
+            onTouchStart={(e) => handleTouch(e, () => onAction(isUpHeld ? PlayerAction.PUNCH_RIGHT_HEAD : PlayerAction.PUNCH_RIGHT_BODY))}
         >
-            <Swords size={28} className="rotate-90 scale-x-[-1]"/>
-            <span className="absolute bottom-2 text-[8px] font-bold opacity-70">R</span>
+            <Swords className="w-8 h-8 md:w-12 md:h-12 rotate-90 scale-x-[-1]"/>
+            <span className="absolute bottom-3 text-[10px] font-bold opacity-80">R</span>
         </button>
       </div>
     </div>
