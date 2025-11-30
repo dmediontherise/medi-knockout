@@ -119,5 +119,36 @@
   <body>
     <div id="root"></div>
     <script type="module" src="/index.tsx"></script>
+    <script>
+      // STRICT IOS ZOOM PREVENTION
+      // Prevent pinch-to-zoom
+      document.addEventListener('gesturestart', function(e) {
+        e.preventDefault();
+      });
+      document.addEventListener('gesturechange', function(e) {
+        e.preventDefault();
+      }); 
+      document.addEventListener('gestureend', function(e) {
+        e.preventDefault();
+      });
+
+      // Prevent double-tap zoom
+      let lastTouchEnd = 0;
+      document.addEventListener('touchend', function (event) {
+        const now = (new Date()).getTime();
+        if (now - lastTouchEnd <= 300) {
+          event.preventDefault();
+        }
+        lastTouchEnd = now;
+      }, false);
+
+      // Prevent rubber-banding/overscroll on the body
+      document.body.addEventListener('touchmove', function(event) { 
+        // Allow internal scrolling if we had any, but for this game we don't want any body scroll
+        if (event.target === document.body) {
+           event.preventDefault();
+        }
+      }, { passive: false });
+    </script>
   </body>
 </html>
