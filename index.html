@@ -3,25 +3,30 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover, interactive-widget=resizes-content" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=0, viewport-fit=cover">
     <title>medi knockout 2D</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=Share+Tech+Mono&display=swap" rel="stylesheet">
     <style>
+      :root {
+        touch-action: none;
+      }
       * {
         touch-action: none !important;
         -webkit-touch-callout: none !important;
         -webkit-user-select: none !important;
         user-select: none !important;
+        -webkit-tap-highlight-color: transparent !important;
       }
       html, body {
         height: 100%;
+        height: 100dvh; /* Use dynamic viewport height */
         width: 100%;
         margin: 0;
         padding: 0;
         overflow: hidden;
-        position: fixed; /* Prevent rubber-banding on iOS */
-        overscroll-behavior: none; /* Prevent pull-to-refresh */
+        position: fixed;
+        overscroll-behavior: none;
       }
       body {
         font-family: 'Share Tech Mono', monospace;
@@ -127,18 +132,13 @@
     <script type="module" src="/index.tsx"></script>
     <script>
       // STRICT IOS ZOOM PREVENTION
-      // Prevent pinch-to-zoom
-      document.addEventListener('gesturestart', function(e) {
-        e.preventDefault();
-      });
-      document.addEventListener('gesturechange', function(e) {
-        e.preventDefault();
-      }); 
-      document.addEventListener('gestureend', function(e) {
-        e.preventDefault();
-      });
+      
+      // 1. Prevent standard pinch-to-zoom events
+      document.addEventListener('gesturestart', (e) => e.preventDefault());
+      document.addEventListener('gesturechange', (e) => e.preventDefault());
+      document.addEventListener('gestureend', (e) => e.preventDefault());
 
-      // Prevent double-tap zoom
+      // 2. Prevent double-tap to zoom (logic + explicit dblclick event)
       let lastTouchEnd = 0;
       document.addEventListener('touchend', function (event) {
         const now = (new Date()).getTime();
@@ -146,15 +146,20 @@
           event.preventDefault();
         }
         lastTouchEnd = now;
-      }, false);
+      }, { passive: false }); // passive: false is crucial here
 
-      // Prevent rubber-banding/overscroll on the body
-      document.body.addEventListener('touchmove', function(event) { 
-        // Allow internal scrolling if we had any, but for this game we don't want any body scroll
-        if (event.target === document.body) {
-           event.preventDefault();
-        }
+      // 3. Prevent actual "double click" event which browsers fire after double tap
+      document.addEventListener('dblclick', function(event) {
+        event.preventDefault();
       }, { passive: false });
+
+      // 4. Prevent scrolling/rubber-banding
+      document.addEventListener('touchmove', function(event) { 
+        event.preventDefault();
+      }, { passive: false });
+
+      // 5. Force touch-action none on root
+      document.documentElement.style.touchAction = 'none';
     </script>
   </body>
 </html>
