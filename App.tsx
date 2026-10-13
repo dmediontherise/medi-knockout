@@ -224,9 +224,9 @@ const App: React.FC = () => {
         </div>
       )}
 
-      {/* --- Controls Area (Bottom 35%) --- */}
+      {/* --- Controls Area --- */}
       {!posePreviewState && (
-        <div className="w-full h-[35%] min-h-[220px] bg-slate-950 border-t-4 border-slate-700 relative z-50 flex-shrink-0 pb-[env(safe-area-inset-bottom)]">
+        <div className="w-full h-[25%] min-h-[160px] max-h-[180px] md:h-[22%] bg-slate-950 border-t-4 border-slate-700 relative z-50 flex-shrink-0 pb-[env(safe-area-inset-bottom)]">
           {gameState === GameState.PLAYING && (
             <Controls onAction={handlePlayerInput} onReleaseBlock={releaseBlock} />
           )}

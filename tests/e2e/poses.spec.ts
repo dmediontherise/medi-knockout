@@ -4,6 +4,7 @@ import * as path from 'path';
 import { PNG } from 'pngjs';
 import { Jimp } from 'jimp';
 import { NES_PALETTE } from '../../src/render/nesPalette';
+import { FONT_8X8 } from '../../src/render/sprites/font';
 
 const OPPONENT_IDS = ['aint_man', 'medi_jinx', 'dj_tito', 'mr_yankee', 'maga_man'];
 
@@ -71,6 +72,28 @@ function verifyPngNesPalette(filePath: string): void {
   expect(Array.from(invalidColors), `Found non-NES palette pixels in ${filePath}`).toEqual([]);
 }
 
+// Draw bitmap text into a Jimp image
+function drawBitmapTextOnJimp(
+  image: any,
+  text: string,
+  startX: number,
+  startY: number,
+  color: number = 0xffffffff
+): void {
+  let cx = startX;
+  for (const ch of text.toUpperCase()) {
+    const glyph = FONT_8X8[ch] || FONT_8X8[' '];
+    for (let gy = 0; gy < 8; gy++) {
+      for (let gx = 0; gx < 8; gx++) {
+        if (glyph[gy][gx] === '#') {
+          image.setPixelColor(color, cx + gx, startY + gy);
+        }
+      }
+    }
+    cx += 8;
+  }
+}
+
 test.describe('Pose Preview and Contact Sheets Suite', () => {
   const screenshotsDir = path.resolve(process.cwd(), 'screenshots');
   const posesDir = path.join(screenshotsDir, 'poses');
@@ -130,15 +153,17 @@ test.describe('Pose Preview and Contact Sheets Suite', () => {
   // 3. Contact Sheet generation per opponent: screenshots/contact-<opponent_id>.png
   for (const oppId of OPPONENT_IDS) {
     test(`contact sheet: contact-${oppId}`, async () => {
-      // Create contact sheet grid: e.g. 5 columns by 4 rows (20 slots for 19 actions)
+      // 5 columns by 4 rows grid
       const cols = 5;
       const rows = Math.ceil(OPPONENT_ACTIONS.length / cols);
       const cellW = 256;
       const cellH = 240;
+      const labelH = 16;
+      const totalCellH = cellH + labelH;
       const totalW = cols * cellW;
-      const totalH = rows * cellH;
+      const totalH = rows * totalCellH;
 
-      const sheet = new Jimp({ width: totalW, height: totalH, color: 0x0f172aff });
+      const sheet = new Jimp({ width: totalW, height: totalH, color: 0x000000ff });
 
       for (let i = 0; i < OPPONENT_ACTIONS.length; i++) {
         const action = OPPONENT_ACTIONS[i];
@@ -149,9 +174,27 @@ test.describe('Pose Preview and Contact Sheets Suite', () => {
         const colIdx = i % cols;
         const rowIdx = Math.floor(i / cols);
         const posX = colIdx * cellW;
-        const posY = rowIdx * cellH;
+        const posY = rowIdx * totalCellH;
 
+        // Composite pose canvas
         sheet.composite(frameImg, posX, posY);
+
+        // Draw action label underneath cell
+        const textX = posX + Math.max(4, Math.floor((cellW - action.length * 8) / 2));
+        const textY = posY + cellH + 4;
+        drawBitmapTextOnJimp(sheet, action, textX, textY, 0xffffffff);
+
+        // Assert requirement 7: label area of each cell has non-background pixels
+        let nonBgLabelPixels = 0;
+        for (let ly = posY + cellH; ly < posY + totalCellH; ly++) {
+          for (let lx = posX; lx < posX + cellW; lx++) {
+            const pixelVal = sheet.getPixelColor(lx, ly);
+            if (pixelVal === 0xffffffff) {
+              nonBgLabelPixels++;
+            }
+          }
+        }
+        expect(nonBgLabelPixels, `Missing label pixels for ${action} in contact-${oppId}`).toBeGreaterThan(0);
       }
 
       const contactPath = path.join(screenshotsDir, `contact-${oppId}.png`);

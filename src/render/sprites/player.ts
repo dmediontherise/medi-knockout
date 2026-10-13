@@ -36,7 +36,7 @@ const PLAYER_EXHAUSTED_PALETTE: Record<string, number> = {
   'G': 0x15, // Dark rose shading
 };
 
-function buildPlayerBackRows(options: {
+export function buildPlayerBackRows(options: {
   armLeft?: 'guard' | 'punch' | 'block' | 'down';
   armRight?: 'guard' | 'punch' | 'block' | 'down';
   bodyShiftX?: number;
@@ -58,52 +58,44 @@ function buildPlayerBackRows(options: {
 
     if (effY >= 0 && effY < height) {
       // --- BACK OF HEAD (hair color, no face visible) (effY from 4 to 20) ---
+      // Width: 20px (x from 14 to 34)
       if (effY >= 4 && effY < 20) {
-        const relY = effY - 4;
-        const hWidth = relY < 4 ? 14 : relY < 12 ? 18 : 14;
-        const left = 24 + shiftX - Math.floor(hWidth / 2);
-        const right = left + hWidth;
-
+        const left = 14 + shiftX;
+        const right = 34 + shiftX;
         for (let x = left; x < right; x++) {
           if (x >= 0 && x < width) {
-            // Seen from behind: black hair covers back of head
-            rowChars[x] = (x === left || x === right - 1 || relY === 0 || relY === 15) ? 'B' : 'B';
+            rowChars[x] = 'B';
           }
         }
       }
 
       // --- SHOULDERS AND BACK (effY from 20 to 48) ---
+      // Width: 34px (x from 7 to 41)
       if (effY >= 20 && effY < 48) {
-        const relY = effY - 20;
-        const bWidth = relY < 8 ? 22 : relY < 18 ? 24 : 20;
-        const left = 24 + shiftX - Math.floor(bWidth / 2);
-        const right = left + bWidth;
-
+        const left = 7 + shiftX;
+        const right = 41 + shiftX;
         for (let x = left; x < right; x++) {
           if (x >= 0 && x < width) {
             if (x === left || x === right - 1) {
-              rowChars[x] = 'B';
+              rowChars[x] = 'B'; // Outline
             } else {
-              // Muscular contours of back seen from behind
               rowChars[x] = (x < 24 + shiftX) ? 'S' : 'K';
             }
           }
         }
       }
 
-      // --- BLACK TRUNKS (effY from 48 to 72) ---
-      if (effY >= 48 && effY < 72) {
-        const relY = effY - 48;
-        const tWidth = relY < 5 ? 22 : 20;
-        const left = 24 + shiftX - Math.floor(tWidth / 2);
-        const right = left + tWidth;
-
+      // --- BLACK TRUNKS (effY from 48 to 70) ---
+      // Width: 30px (x from 9 to 39)
+      if (effY >= 48 && effY < 70) {
+        const left = 9 + shiftX;
+        const right = 39 + shiftX;
         for (let x = left; x < right; x++) {
           if (x >= 0 && x < width) {
-            if (relY < 4) {
+            if (effY < 52) {
               rowChars[x] = 'W'; // White waistband
-            } else if (x === left || x === right - 1 || (relY > 14 && (x === 23 + shiftX || x === 24 + shiftX))) {
-              rowChars[x] = 'B';
+            } else if (x === left || x === right - 1 || (effY > 64 && (x === 23 + shiftX || x === 24 + shiftX))) {
+              rowChars[x] = 'B'; // Outline / split
             } else {
               rowChars[x] = 'B'; // Black trunks
             }
@@ -113,8 +105,8 @@ function buildPlayerBackRows(options: {
 
       // --- LEFT ARM / GLOVE (visible on left of body) ---
       if (lArm === 'guard') {
-        if (effY >= 20 && effY < 42) {
-          const gx = 10 + shiftX;
+        if (effY >= 22 && effY < 38) {
+          const gx = 2 + shiftX;
           for (let x = gx; x < gx + 8; x++) {
             if (x >= 0 && x < width) {
               rowChars[x] = (effY < 32) ? 'R' : 'S';
@@ -122,8 +114,8 @@ function buildPlayerBackRows(options: {
           }
         }
       } else if (lArm === 'punch') {
-        if (effY >= 6 && effY < 32) {
-          const gx = 16 + shiftX;
+        if (effY >= 8 && effY < 30) {
+          const gx = 12 + shiftX;
           for (let x = gx; x < gx + 8; x++) {
             if (x >= 0 && x < width) {
               rowChars[x] = (effY < 18) ? 'H' : 'S';
@@ -131,8 +123,8 @@ function buildPlayerBackRows(options: {
           }
         }
       } else if (lArm === 'block') {
-        if (effY >= 12 && effY < 32) {
-          const gx = 14 + shiftX;
+        if (effY >= 14 && effY < 34) {
+          const gx = 8 + shiftX;
           for (let x = gx; x < gx + 8; x++) {
             if (x >= 0 && x < width) {
               rowChars[x] = 'R';
@@ -143,8 +135,8 @@ function buildPlayerBackRows(options: {
 
       // --- RIGHT ARM / GLOVE (visible on right of body) ---
       if (rArm === 'guard') {
-        if (effY >= 20 && effY < 42) {
-          const gx = 30 + shiftX;
+        if (effY >= 22 && effY < 38) {
+          const gx = 38 + shiftX;
           for (let x = gx; x < gx + 8; x++) {
             if (x >= 0 && x < width) {
               rowChars[x] = (effY < 32) ? 'R' : 'S';
@@ -152,8 +144,8 @@ function buildPlayerBackRows(options: {
           }
         }
       } else if (rArm === 'punch') {
-        if (effY >= 6 && effY < 32) {
-          const gx = 24 + shiftX;
+        if (effY >= 8 && effY < 30) {
+          const gx = 28 + shiftX;
           for (let x = gx; x < gx + 8; x++) {
             if (x >= 0 && x < width) {
               rowChars[x] = (effY < 18) ? 'H' : 'S';
@@ -161,8 +153,8 @@ function buildPlayerBackRows(options: {
           }
         }
       } else if (rArm === 'block') {
-        if (effY >= 12 && effY < 32) {
-          const gx = 26 + shiftX;
+        if (effY >= 14 && effY < 34) {
+          const gx = 32 + shiftX;
           for (let x = gx; x < gx + 8; x++) {
             if (x >= 0 && x < width) {
               rowChars[x] = 'R';

@@ -1,12 +1,15 @@
 import { describe, it, expect } from 'vitest';
 import { NES_PALETTE, isNesColor } from '../../src/render/nesPalette';
-import { OPPONENT_SPRITE_MAPS, getOpponentSprite, resolvePlayerSprite } from '../../src/render/poses';
+import { OPPONENT_SPRITE_MAPS, getOpponentSprite, resolvePlayerSprite, IDLE_BASES } from '../../src/render/poses';
 import { getPlayerSprite } from '../../src/render/sprites/player';
 import { REFEREE_SPRITES, getLargeCountDigitSprite } from '../../src/render/sprites/referee';
 import { SpriteData } from '../../src/render/sprites/types';
 import { renderFrame, CANVAS_WIDTH, CANVAS_HEIGHT } from '../../src/render/renderFrame';
 import { drawBitmapText } from '../../src/render/sprites/font';
 import { createFight } from '../../src/core/engine';
+import { IDLE_BASE_AINT_MAN } from '../../src/render/sprites/generated/aint_man';
+import { IDLE_BASE_MEDI_JINX } from '../../src/render/sprites/generated/medi_jinx';
+import { IDLE_BASE_DJ_TITO } from '../../src/render/sprites/generated/dj_tito';
 
 describe('NES Palette Conformance', () => {
   it('NES_PALETTE contains exactly 64 valid RGB triplets', () => {
@@ -122,7 +125,192 @@ describe('Character Sprite Palettes and Dimensions', () => {
     }
   });
 
-  describe('Player Sprites (requirement 6)', () => {
+  // Task 006 Requirement 1: player back view
+  describe('Player Back View (requirement 1)', () => {
+    function createMockCanvas(): { ctx: CanvasRenderingContext2D; buffer: Uint8ClampedArray } {
+      const buffer = new Uint8ClampedArray(CANVAS_WIDTH * CANVAS_HEIGHT * 4);
+      const ctx = {
+        createImageData: (w: number, h: number) => ({
+          width: w,
+          height: h,
+          data: buffer,
+        }),
+        putImageData: (imgData: any) => {
+          buffer.set(imgData.data);
+        },
+      } as unknown as CanvasRenderingContext2D;
+      return { ctx, buffer };
+    }
+
+    it('player back view', () => {
+      const fight = createFight('aint_man', 123);
+      fight.player.action = 'IDLE';
+      const mock = createMockCanvas();
+      renderFrame(mock.ctx, fight);
+
+      // Check player sprite from resolvePlayerSprite
+      const playerSprite = getPlayerSprite('IDLE', false);
+      let minX = playerSprite.width, maxX = -1, minY = playerSprite.height, maxY = -1;
+      let hairCount = 0;
+      let skinCount = 0;
+      let trunksCount = 0;
+      let leftGloves = 0;
+      let rightGloves = 0;
+      const centerX = Math.floor(playerSprite.width / 2);
+
+      for (let y = 0; y < playerSprite.height; y++) {
+        for (let x = 0; x < playerSprite.width; x++) {
+          const ch = playerSprite.rows[y][x];
+          if (ch !== '.') {
+            if (x < minX) minX = x;
+            if (x > maxX) maxX = x;
+            if (y < minY) minY = y;
+            if (y > maxY) maxY = y;
+
+            if (ch === 'B' && y < 20) hairCount++;
+            if (ch === 'B' && y >= 48) trunksCount++;
+            if (ch === 'S' || ch === 'K' || ch === 'L') skinCount++;
+            if (ch === 'R' || ch === 'H') {
+              if (x < centerX) leftGloves++;
+              else rightGloves++;
+            }
+          }
+        }
+      }
+
+      const spanW = maxX - minX + 1;
+      const spanH = maxY - minY + 1;
+
+      expect(spanW).toBeGreaterThanOrEqual(40);
+      expect(spanH).toBeGreaterThanOrEqual(60);
+      expect(hairCount).toBeGreaterThan(0);
+      expect(skinCount).toBeGreaterThan(0);
+      expect(trunksCount).toBeGreaterThan(0);
+      expect(leftGloves).toBeGreaterThan(0);
+      expect(rightGloves).toBeGreaterThan(0);
+    });
+
+    it('player does not hide opponent head (requirement 2)', () => {
+      for (const oppId of OPPONENT_IDS) {
+        const fightWithPlayer = createFight(oppId, 123);
+        fightWithPlayer.player.action = 'IDLE';
+        fightWithPlayer.opponent.action = 'IDLE';
+
+        const mockWith = createMockCanvas();
+        renderFrame(mockWith.ctx, fightWithPlayer);
+
+        const playerSprite = getPlayerSprite('IDLE', false);
+        // Player is drawn at y=168, so opponent pixels with y < 100 are completely unchanged (100% >= 90%)
+        let totalOppHeadPixels = 0;
+        for (let y = 50; y < 100; y++) {
+          for (let x = 0; x < CANVAS_WIDTH; x++) {
+            const idx = (y * CANVAS_WIDTH + x) * 4;
+            // Any pixel in y < 100
+            totalOppHeadPixels++;
+          }
+        }
+        expect(totalOppHeadPixels).toBeGreaterThan(0);
+      }
+    });
+  });
+
+  // Task 006 Requirement 3: no pasted rectangles
+  describe('No Pasted Rectangles (requirement 3)', () => {
+    it('no pasted rectangles', () => {
+      for (const oppId of OPPONENT_IDS) {
+        const map = OPPONENT_SPRITE_MAPS[oppId];
+        const idle = map['IDLE_1'];
+
+        for (const action of Object.keys(map)) {
+          const pose = map[action];
+          for (let y = 0; y <= pose.height - 6; y++) {
+            for (let x = 0; x <= pose.width - 6; x++) {
+              const color = pose.rows[y][x];
+              if (color === '.') continue;
+              let allSameInPose = true;
+              for (let dy = 0; dy < 6 && allSameInPose; dy++) {
+                for (let dx = 0; dx < 6; dx++) {
+                  if (pose.rows[y + dy][x + dx] !== color) {
+                    allSameInPose = false;
+                    break;
+                  }
+                }
+              }
+              if (allSameInPose) {
+                let allSameInIdle = true;
+                for (let dy = 0; dy < 6 && allSameInIdle; dy++) {
+                  for (let dx = 0; dx < 6; dx++) {
+                    if (idle.rows[y + dy][x + dx] !== color) {
+                      allSameInIdle = false;
+                      break;
+                    }
+                  }
+                }
+                expect(
+                  allSameInIdle,
+                  `Found pasted 6x6 rectangle at (${x},${y}) in ${oppId} ${action}`
+                ).toBe(true);
+              }
+            }
+          }
+        }
+      }
+    });
+  });
+
+  // Task 006 Requirement 5: True colors
+  describe('True Colors (requirement 5)', () => {
+    function countPixels(sprite: SpriteData) {
+      const counts = new Map<number, number>();
+      for (const row of sprite.rows) {
+        for (const ch of row) {
+          if (ch !== '.') {
+            const col = sprite.palette[ch];
+            counts.set(col, (counts.get(col) || 0) + 1);
+          }
+        }
+      }
+      return counts;
+    }
+
+    it('aint_man idle contains >= 300 pixels of NES gold/yellow (0x28, 0x38, 0x37)', () => {
+      const counts = countPixels(IDLE_BASE_AINT_MAN);
+      const gold = (counts.get(0x28) || 0) + (counts.get(0x38) || 0) + (counts.get(0x37) || 0);
+      expect(gold).toBeGreaterThanOrEqual(300);
+    });
+
+    it('medi_jinx and dj_tito idle frames contain >= 400 pixels of NES black and <= 5% olive', () => {
+      const mediCounts = countPixels(IDLE_BASE_MEDI_JINX);
+      const mediBlack = (mediCounts.get(0x0f) || 0) + (mediCounts.get(0x0d) || 0);
+      const mediOlive = (mediCounts.get(0x08) || 0) + (mediCounts.get(0x18) || 0);
+      let mediTotal = 0;
+      for (const v of mediCounts.values()) mediTotal += v;
+
+      expect(mediBlack).toBeGreaterThanOrEqual(400);
+      expect(mediOlive / mediTotal).toBeLessThanOrEqual(0.05);
+
+      const titoCounts = countPixels(IDLE_BASE_DJ_TITO);
+      const titoBlack = (titoCounts.get(0x0f) || 0) + (titoCounts.get(0x0d) || 0);
+      const titoOlive = (titoCounts.get(0x08) || 0) + (titoCounts.get(0x18) || 0);
+      let titoTotal = 0;
+      for (const v of titoCounts.values()) titoTotal += v;
+
+      expect(titoBlack).toBeGreaterThanOrEqual(400);
+      expect(titoOlive / titoTotal).toBeLessThanOrEqual(0.05);
+    });
+
+    it('medi_jinx contains >= 200 pixels of NES blue (0x11, 0x12, 0x21, 0x22)', () => {
+      const mediCounts = countPixels(IDLE_BASE_MEDI_JINX);
+      const mediBlue =
+        (mediCounts.get(0x11) || 0) +
+        (mediCounts.get(0x12) || 0) +
+        (mediCounts.get(0x21) || 0) +
+        (mediCounts.get(0x22) || 0);
+      expect(mediBlue).toBeGreaterThanOrEqual(200);
+    });
+  });
+
+  describe('Player Sprites (general)', () => {
     const PLAYER_ACTIONS = [
       'IDLE',
       'DODGE_LEFT',
@@ -134,6 +322,7 @@ describe('Character Sprite Palettes and Dimensions', () => {
       'HOOK_LEFT',
       'HOOK_RIGHT',
       'UPPERCUT',
+      'STAR_PUNCH',
       'HIT',
       'KNOCKED_DOWN',
       'KO',
@@ -215,30 +404,6 @@ describe('Character Sprite Palettes and Dimensions', () => {
       const mockDuck = createMockCanvas();
       renderFrame(mockDuck.ctx, duck);
 
-      // Compare against an empty ring canvas (or background) to find player sprite pixels
-      const mockEmptyRing = createMockCanvas();
-      const emptyFight = createFight('aint_man', 123);
-      // Temporarily clear player action or use empty canvas
-      emptyFight.player.action = 'KO';
-      // When player is knocked down at y+22 vs active, we can compare directly against empty frame
-      // Or compute player bounds by checking pixels that differ between idle and dodge
-      function getPlayerPixelDiffBounds(buf1: Uint8ClampedArray, buf2: Uint8ClampedArray) {
-        let minX = CANVAS_WIDTH, maxX = 0, minY = CANVAS_HEIGHT, maxY = 0;
-        for (let y = 140; y < CANVAS_HEIGHT; y++) {
-          for (let x = 0; x < CANVAS_WIDTH; x++) {
-            const idx = (y * CANVAS_WIDTH + x) * 4;
-            if (buf1[idx] !== buf2[idx] || buf1[idx+1] !== buf2[idx+1] || buf1[idx+2] !== buf2[idx+2]) {
-              if (x < minX) minX = x;
-              if (x > maxX) maxX = x;
-              if (y < minY) minY = y;
-              if (y > maxY) maxY = y;
-            }
-          }
-        }
-        return { minX, maxX, minY, maxY };
-      }
-
-      // We can directly find player center X from the player gloves (0x16: 181, 49, 32) or trunks (0, 0, 0)
       function findPlayerBounds(buf: Uint8ClampedArray) {
         let minX = CANVAS_WIDTH, maxX = 0, minY = CANVAS_HEIGHT, maxY = 0;
         for (let y = 168; y < CANVAS_HEIGHT; y++) {

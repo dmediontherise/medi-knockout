@@ -8,13 +8,57 @@ const match = nesPaletteFile.match(/export const NES_PALETTE[^=]*=\s*(\[[^;]+\])
 if (!match) throw new Error('Could not parse NES_PALETTE from src/render/nesPalette.ts');
 const NES_PALETTE = eval(match[1]);
 
-function nearestNesIndex(r, g, b, allowedPalette = null) {
+// sRGB to CIELAB conversion for perceptual matching
+function rgbToLab(r, g, b) {
+  let rL = r / 255, gL = g / 255, bL = b / 255;
+  rL = rL > 0.04045 ? Math.pow((rL + 0.055) / 1.055, 2.4) : rL / 12.92;
+  gL = gL > 0.04045 ? Math.pow((gL + 0.055) / 1.055, 2.4) : gL / 12.92;
+  bL = bL > 0.04045 ? Math.pow((bL + 0.055) / 1.055, 2.4) : bL / 12.92;
+
+  let X = (rL * 0.4124 + gL * 0.3576 + bL * 0.1805) * 100;
+  let Y = (rL * 0.2126 + gL * 0.7152 + bL * 0.0722) * 100;
+  let Z = (rL * 0.0193 + gL * 0.1192 + bL * 0.9505) * 100;
+
+  X /= 95.047; Y /= 100.000; Z /= 108.883;
+  const f = t => t > 0.008856 ? Math.cbrt(t) : (7.787 * t) + (16 / 116);
+  const fX = f(X), fY = f(Y), fZ = f(Z);
+  return [(116 * fY) - 16, 500 * (fX - fY), 200 * (fY - fZ)];
+}
+
+const NES_LAB = NES_PALETTE.map(([r, g, b]) => rgbToLab(r, g, b));
+
+function nearestNesLab(r, g, b, allowed = null, charId = '') {
+  // Preserve true black (prevent turning to dark olive/brown)
+  if (r < 40 && g < 40 && b < 40) {
+    if (allowed) {
+      if (allowed.includes(0x0F)) return 0x0F;
+      if (allowed.includes(0x0D)) return 0x0D;
+    } else {
+      return 0x0F;
+    }
+  }
+
+  // Preserve true gold/yellow for aint_man helmet and pants
+  if (charId === 'aint_man' && r > 150 && g > 120 && b < 100) {
+    const golds = [0x28, 0x38, 0x37, 0x27];
+    const sub = allowed ? allowed.filter(x => golds.includes(x)) : golds;
+    if (sub.length > 0) return sub[0];
+  }
+
+  // Preserve true blue skin tone for medi_jinx
+  if (charId === 'medi_jinx' && (b > r + 10 || b > g + 10) && b > 50) {
+    const blues = [0x11, 0x12, 0x21, 0x22];
+    const sub = allowed ? allowed.filter(x => blues.includes(x)) : blues;
+    if (sub.length > 0) return sub[0];
+  }
+
+  const lab = rgbToLab(r, g, b);
   let bestDist = Infinity;
   let bestIdx = 0;
-  const indicesToCheck = allowedPalette ? allowedPalette : NES_PALETTE.map((_, i) => i);
-  for (const i of indicesToCheck) {
-    const [pr, pg, pb] = NES_PALETTE[i];
-    const d = (pr - r) ** 2 + (pg - g) ** 2 + (pb - b) ** 2;
+  const list = allowed ? allowed : NES_PALETTE.map((_, i) => i);
+  for (const i of list) {
+    const nLab = NES_LAB[i];
+    const d = (lab[0] - nLab[0]) ** 2 + (lab[1] - nLab[1]) ** 2 + (lab[2] - nLab[2]) ** 2;
     if (d < bestDist) {
       bestDist = d;
       bestIdx = i;
@@ -40,7 +84,173 @@ if (!fs.existsSync(OUT_DIR)) {
 // Letter tokens for palette mapping in SpriteData
 const PALETTE_TOKENS = '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz';
 
+// Function to process an image box into quantized SpriteData
+async function processSpriteImage(img, box, targetW, targetH, charId) {
+  const cropped = img.clone().crop(box);
+  cropped.resize({ w: targetW, h: targetH });
+
+  const isBgPixel = (x, y) => {
+    const idx = (y * targetW + x) * 4;
+    const r = cropped.bitmap.data[idx];
+    const g = cropped.bitmap.data[idx + 1];
+    const b = cropped.bitmap.data[idx + 2];
+    return r >= 205 && g >= 205 && b >= 205;
+  };
+
+  const isBg = new Uint8Array(targetW * targetH);
+  const queue = [];
+
+  for (let x = 0; x < targetW; x++) {
+    if (isBgPixel(x, 0)) { isBg[x] = 1; queue.push([x, 0]); }
+    if (isBgPixel(x, targetH - 1)) { isBg[(targetH - 1) * targetW + x] = 1; queue.push([x, targetH - 1]); }
+  }
+  for (let y = 0; y < targetH; y++) {
+    if (!isBg[y * targetW] && isBgPixel(0, y)) { isBg[y * targetW] = 1; queue.push([0, y]); }
+    if (!isBg[y * targetW + targetW - 1] && isBgPixel(targetW - 1, y)) { isBg[y * targetW + targetW - 1] = 1; queue.push([targetW - 1, y]); }
+  }
+
+  while (queue.length > 0) {
+    const [cx, cy] = queue.pop();
+    for (const [dx, dy] of [[-1, 0], [1, 0], [0, -1], [0, 1]]) {
+      const nx = cx + dx, ny = cy + dy;
+      if (nx >= 0 && nx < targetW && ny >= 0 && ny < targetH && !isBg[ny * targetW + nx]) {
+        if (isBgPixel(nx, ny)) {
+          isBg[ny * targetW + nx] = 1;
+          queue.push([nx, ny]);
+        }
+      }
+    }
+  }
+
+  // Halo clean-up
+  for (let y = 0; y < targetH; y++) {
+    for (let x = 0; x < targetW; x++) {
+      if (!isBg[y * targetW + x]) {
+        const idx = (y * targetW + x) * 4;
+        const r = cropped.bitmap.data[idx];
+        const g = cropped.bitmap.data[idx + 1];
+        const b = cropped.bitmap.data[idx + 2];
+        if (r > 210 && g > 210 && b > 210) {
+          let adjacentToBg = false;
+          for (const [dx, dy] of [[-1, 0], [1, 0], [0, -1], [0, 1]]) {
+            const nx = x + dx, ny = y + dy;
+            if (nx < 0 || nx >= targetW || ny < 0 || ny >= targetH || isBg[ny * targetW + nx]) {
+              adjacentToBg = true;
+              break;
+            }
+          }
+          if (adjacentToBg) {
+            isBg[y * targetW + x] = 1;
+          }
+        }
+      }
+    }
+  }
+
+  // Count colors perceptually
+  const colorCounts = new Map();
+  for (let y = 0; y < targetH; y++) {
+    for (let x = 0; x < targetW; x++) {
+      if (!isBg[y * targetW + x]) {
+        const idx = (y * targetW + x) * 4;
+        const r = cropped.bitmap.data[idx];
+        const g = cropped.bitmap.data[idx + 1];
+        const b = cropped.bitmap.data[idx + 2];
+        const nes = nearestNesLab(r, g, b, null, charId);
+        colorCounts.set(nes, (colorCounts.get(nes) || 0) + 1);
+      }
+    }
+  }
+
+  // Ensure key characteristic colors are included in the top 12
+  if (charId === 'aint_man' && !colorCounts.has(0x28) && !colorCounts.has(0x38) && !colorCounts.has(0x37)) {
+    colorCounts.set(0x37, 500);
+  }
+  if (charId === 'medi_jinx' && !colorCounts.has(0x11) && !colorCounts.has(0x12) && !colorCounts.has(0x21) && !colorCounts.has(0x22)) {
+    colorCounts.set(0x11, 500);
+  }
+  if (colorCounts.has(0x08) && (charId === 'medi_jinx' || charId === 'dj_tito')) {
+    colorCounts.delete(0x08);
+  }
+  if (colorCounts.has(0x18) && (charId === 'medi_jinx' || charId === 'dj_tito')) {
+    colorCounts.delete(0x18);
+  }
+
+  const sorted = [...colorCounts.entries()].sort((a, b) => b[1] - a[1]);
+  const top12 = sorted.slice(0, 12).map(([idx]) => idx);
+
+  const paletteMap = { '.': -1 };
+  top12.forEach((nesIdx, i) => {
+    paletteMap[PALETTE_TOKENS[i]] = nesIdx;
+  });
+
+  const rows = [];
+  for (let y = 0; y < targetH; y++) {
+    let rowStr = '';
+    for (let x = 0; x < targetW; x++) {
+      if (isBg[y * targetW + x]) {
+        rowStr += '.';
+      } else {
+        const idx = (y * targetW + x) * 4;
+        const r = cropped.bitmap.data[idx];
+        const g = cropped.bitmap.data[idx + 1];
+        const b = cropped.bitmap.data[idx + 2];
+        const quantized = nearestNesLab(r, g, b, top12, charId);
+        const tokenIndex = top12.indexOf(quantized);
+        rowStr += (tokenIndex !== -1) ? PALETTE_TOKENS[tokenIndex] : '.';
+      }
+    }
+    rows.push(rowStr);
+  }
+
+  return { width: targetW, height: targetH, palette: paletteMap, rows };
+}
+
+// Find connected figures in image sheet
+async function detectSheetFigures(img) {
+  const w = img.bitmap.width;
+  const h = img.bitmap.height;
+  const isContent = (x, y) => {
+    if (x <= 1 || x >= w - 2 || y <= 1 || y >= h - 2) return false;
+    const idx = (y * w + x) * 4;
+    return img.bitmap.data[idx] < 225 || img.bitmap.data[idx + 1] < 225 || img.bitmap.data[idx + 2] < 225;
+  };
+  const visited = new Uint8Array(w * h);
+  const figs = [];
+  for (let y = 2; y < h - 2; y++) {
+    for (let x = 2; x < w - 2; x++) {
+      if (isContent(x, y) && !visited[y * w + x]) {
+        let minX = x, maxX = x, minY = y, maxY = y, count = 0;
+        const q = [[x, y]];
+        visited[y * w + x] = 1;
+        while (q.length > 0) {
+          const [cx, cy] = q.pop();
+          count++;
+          if (cx < minX) minX = cx;
+          if (cx > maxX) maxX = cx;
+          if (cy < minY) minY = cy;
+          if (cy > maxY) maxY = cy;
+          for (const [dx, dy] of [[-1, 0], [1, 0], [0, -1], [0, 1]]) {
+            const nx = cx + dx, ny = cy + dy;
+            if (nx >= 2 && nx < w - 2 && ny >= 2 && ny < h - 2 && !visited[ny * w + nx] && isContent(nx, ny)) {
+              visited[ny * w + nx] = 1;
+              q.push([nx, ny]);
+            }
+          }
+        }
+        if (count > 500) {
+          figs.push({ x: minX, y: minY, w: maxX - minX + 1, h: maxY - minY + 1, count });
+        }
+      }
+    }
+  }
+  figs.sort((a, b) => Math.floor(a.y / 90) * 1000 + a.x - (Math.floor(b.y / 90) * 1000 + b.x));
+  return figs;
+}
+
 async function buildAllSprites() {
+  const spriteMapConfig = {};
+
   for (const charConfig of CHARACTERS) {
     console.log(`Processing ${charConfig.id}...`);
     let img = await Jimp.read(charConfig.file);
@@ -48,138 +258,106 @@ async function buildAllSprites() {
       img = img.crop(charConfig.crop);
     }
 
-    // 1. Crop the top-left figure
-    const cropped = img.clone().crop(charConfig.figBox);
-
-    // 2. Nearest-neighbour resize to Punch-Out target proportions
-    // Nearest-neighbour preserves crisp pixel art
-    const targetW = charConfig.targetW;
-    const targetH = charConfig.targetH;
-    cropped.resize({ w: targetW, h: targetH });
-
-    // 3. Flood fill background starting from image perimeter (near-white pixels)
-    const isBgPixel = (x, y) => {
-      const idx = (y * targetW + x) * 4;
-      const r = cropped.bitmap.data[idx];
-      const g = cropped.bitmap.data[idx + 1];
-      const b = cropped.bitmap.data[idx + 2];
-      return r >= 205 && g >= 205 && b >= 205;
-    };
-
-    const isBg = new Uint8Array(targetW * targetH);
-    const queue = [];
-
-    // Perimeter seeding
-    for (let x = 0; x < targetW; x++) {
-      if (isBgPixel(x, 0)) { isBg[x] = 1; queue.push([x, 0]); }
-      if (isBgPixel(x, targetH - 1)) { isBg[(targetH - 1) * targetW + x] = 1; queue.push([x, targetH - 1]); }
-    }
-    for (let y = 0; y < targetH; y++) {
-      if (!isBg[y * targetW] && isBgPixel(0, y)) { isBg[y * targetW] = 1; queue.push([0, y]); }
-      if (!isBg[y * targetW + targetW - 1] && isBgPixel(targetW - 1, y)) { isBg[y * targetW + targetW - 1] = 1; queue.push([targetW - 1, y]); }
-    }
-
-    while (queue.length > 0) {
-      const [cx, cy] = queue.pop();
-      for (const [dx, dy] of [[-1, 0], [1, 0], [0, -1], [0, 1]]) {
-        const nx = cx + dx;
-        const ny = cy + dy;
-        if (nx >= 0 && nx < targetW && ny >= 0 && ny < targetH && !isBg[ny * targetW + nx]) {
-          if (isBgPixel(nx, ny)) {
-            isBg[ny * targetW + nx] = 1;
-            queue.push([nx, ny]);
-          }
-        }
-      }
-    }
-
-    // 4. White halo clean-up: remove near-white edge pixels adjacent to background
-    for (let y = 0; y < targetH; y++) {
-      for (let x = 0; x < targetW; x++) {
-        if (!isBg[y * targetW + x]) {
-          const idx = (y * targetW + x) * 4;
-          const r = cropped.bitmap.data[idx];
-          const g = cropped.bitmap.data[idx + 1];
-          const b = cropped.bitmap.data[idx + 2];
-          if (r > 210 && g > 210 && b > 210) {
-            let adjacentToBg = false;
-            for (const [dx, dy] of [[-1, 0], [1, 0], [0, -1], [0, 1]]) {
-              const nx = x + dx;
-              const ny = y + dy;
-              if (nx < 0 || nx >= targetW || ny < 0 || ny >= targetH || isBg[ny * targetW + nx]) {
-                adjacentToBg = true;
-                break;
-              }
-            }
-            if (adjacentToBg) {
-              isBg[y * targetW + x] = 1;
-            }
-          }
-        }
-      }
-    }
-
-    // 5. Gather color frequencies to quantize to at most 12 NES colors
-    const colorCounts = new Map();
-    for (let y = 0; y < targetH; y++) {
-      for (let x = 0; x < targetW; x++) {
-        if (!isBg[y * targetW + x]) {
-          const idx = (y * targetW + x) * 4;
-          const r = cropped.bitmap.data[idx];
-          const g = cropped.bitmap.data[idx + 1];
-          const b = cropped.bitmap.data[idx + 2];
-          const nes = nearestNesIndex(r, g, b);
-          colorCounts.set(nes, (colorCounts.get(nes) || 0) + 1);
-        }
-      }
-    }
-
-    // Sort by frequency and cap at 12 colors
-    const sorted = [...colorCounts.entries()].sort((a, b) => b[1] - a[1]);
-    const top12 = sorted.slice(0, 12).map(([idx]) => idx);
-
-    // Map all non-background pixels to the selected top 12 NES palette
-    const paletteMap = { '.': -1 };
-    top12.forEach((nesIdx, i) => {
-      paletteMap[PALETTE_TOKENS[i]] = nesIdx;
-    });
-
-    const rows = [];
-    for (let y = 0; y < targetH; y++) {
-      let rowStr = '';
-      for (let x = 0; x < targetW; x++) {
-        if (isBg[y * targetW + x]) {
-          rowStr += '.';
-        } else {
-          const idx = (y * targetW + x) * 4;
-          const r = cropped.bitmap.data[idx];
-          const g = cropped.bitmap.data[idx + 1];
-          const b = cropped.bitmap.data[idx + 2];
-          const quantized = nearestNesIndex(r, g, b, top12);
-          const tokenIndex = top12.indexOf(quantized);
-          rowStr += PALETTE_TOKENS[tokenIndex];
-        }
-      }
-      rows.push(rowStr);
-    }
+    // 1. Process Idle base
+    const idleSprite = await processSpriteImage(img, charConfig.figBox, charConfig.targetW, charConfig.targetH, charConfig.id);
 
     // Export sprite data file
-    const content = `import { SpriteData } from '../types';
+    let extraExports = '';
 
-export const IDLE_BASE_${charConfig.id.toUpperCase()}: SpriteData = {
-  width: ${targetW},
-  height: ${targetH},
-  palette: ${JSON.stringify(paletteMap, null, 2)},
+    if (charConfig.id !== 'player') {
+      const sheetFigures = await detectSheetFigures(img);
+      // Map sheet figures:
+      // aint_man: 15 figs. hit: 8, stunned: 9, kd: 14, taunt: 12
+      // medi_jinx: 11 figs. hit: 6, stunned: 7, kd: 9, taunt: 10
+      // dj_tito: 12 figs. hit: 7, stunned: 8, kd: 10, taunt: 11
+      // mr_yankee: 11 figs. hit: 6, stunned: 7, kd: 10, taunt: 9
+      // maga_man: 11 figs. hit: 6, stunned: 7, kd: 10, taunt: 9
+      const figureMapIndices = {
+        aint_man: { hit: 8, stunned: 9, knocked_down: 14, taunt: 12 },
+        medi_jinx: { hit: 6, stunned: 7, knocked_down: 9, taunt: 10 },
+        dj_tito: { hit: 7, stunned: 8, knocked_down: 10, taunt: 11 },
+        mr_yankee: { hit: 6, stunned: 7, knocked_down: 10, taunt: 9 },
+        maga_man: { hit: 6, stunned: 7, knocked_down: 10, taunt: 9 },
+      }[charConfig.id];
+
+      spriteMapConfig[charConfig.id] = {
+        sheet: charConfig.file,
+        totalFiguresDetected: sheetFigures.length,
+        idleFigureIndex: 0,
+        ...figureMapIndices
+      };
+
+      // Generate extra pose sprites: Hit, Stunned, KnockedDown, Taunt
+      const hitBox = sheetFigures[figureMapIndices.hit];
+      const stunnedBox = sheetFigures[figureMapIndices.stunned];
+      const kdBox = sheetFigures[figureMapIndices.knocked_down];
+      const tauntBox = sheetFigures[figureMapIndices.taunt];
+
+      const hitSprite = await processSpriteImage(img, hitBox, charConfig.targetW, charConfig.targetH, charConfig.id);
+      const stunnedSprite = await processSpriteImage(img, stunnedBox, charConfig.targetW, charConfig.targetH, charConfig.id);
+      const kdSprite = await processSpriteImage(img, kdBox, charConfig.targetW, charConfig.targetH, charConfig.id);
+      const tauntSprite = await processSpriteImage(img, tauntBox, charConfig.targetW, charConfig.targetH, charConfig.id);
+
+      extraExports = `
+export const HIT_BASE_${charConfig.id.toUpperCase()}: SpriteData = {
+  width: ${hitSprite.width},
+  height: ${hitSprite.height},
+  palette: ${JSON.stringify(hitSprite.palette, null, 2)},
   rows: [
-${rows.map(r => `    ${JSON.stringify(r)},`).join('\n')}
+${hitSprite.rows.map(r => `    ${JSON.stringify(r)},`).join('\n')}
+  ],
+};
+
+export const STUNNED_BASE_${charConfig.id.toUpperCase()}: SpriteData = {
+  width: ${stunnedSprite.width},
+  height: ${stunnedSprite.height},
+  palette: ${JSON.stringify(stunnedSprite.palette, null, 2)},
+  rows: [
+${stunnedSprite.rows.map(r => `    ${JSON.stringify(r)},`).join('\n')}
+  ],
+};
+
+export const KD_BASE_${charConfig.id.toUpperCase()}: SpriteData = {
+  width: ${kdSprite.width},
+  height: ${kdSprite.height},
+  palette: ${JSON.stringify(kdSprite.palette, null, 2)},
+  rows: [
+${kdSprite.rows.map(r => `    ${JSON.stringify(r)},`).join('\n')}
+  ],
+};
+
+export const TAUNT_BASE_${charConfig.id.toUpperCase()}: SpriteData = {
+  width: ${tauntSprite.width},
+  height: ${tauntSprite.height},
+  palette: ${JSON.stringify(tauntSprite.palette, null, 2)},
+  rows: [
+${tauntSprite.rows.map(r => `    ${JSON.stringify(r)},`).join('\n')}
   ],
 };
 `;
+    }
+
+    const content = `import { SpriteData } from '../types';
+
+export const IDLE_BASE_${charConfig.id.toUpperCase()}: SpriteData = {
+  width: ${idleSprite.width},
+  height: ${idleSprite.height},
+  palette: ${JSON.stringify(idleSprite.palette, null, 2)},
+  rows: [
+${idleSprite.rows.map(r => `    ${JSON.stringify(r)},`).join('\n')}
+  ],
+};
+${extraExports}`;
 
     const outPath = path.join(OUT_DIR, `${charConfig.id}.ts`);
     fs.writeFileSync(outPath, content, 'utf8');
     console.log(`Wrote ${outPath}`);
   }
+
+  // Write scripts/sprite-map.json per requirement 4
+  const mapPath = 'scripts/sprite-map.json';
+  fs.writeFileSync(mapPath, JSON.stringify(spriteMapConfig, null, 2), 'utf8');
+  console.log(`Wrote ${mapPath}`);
 }
 
 buildAllSprites().catch(err => {

@@ -56,28 +56,17 @@ const Controls: React.FC<ControlsProps> = ({ onAction, onReleaseBlock }) => {
     };
   }, [onAction, onReleaseBlock, isUpHeld]);
 
-  // Helper for touch events
-  const handleTouchStart = (actionId: string, callback: () => void) => {
-    setActiveBtn(actionId);
-    callback();
-  };
-
-  const handleTouchEnd = (callback?: () => void) => {
-    setActiveBtn(null);
-    if (callback) callback();
-  };
-
   // NES Style Constants
   const dpadBase = "absolute bg-slate-800 flex items-center justify-center active:bg-slate-700 transition-colors";
-  const actionBtnBase = "w-16 h-16 md:w-20 md:h-20 rounded-full border-b-4 active:border-b-0 active:translate-y-1 transition-all flex items-center justify-center shadow-lg";
+  const actionBtnBase = "w-14 h-14 md:w-16 md:h-16 rounded-full border-b-4 active:border-b-0 active:translate-y-1 transition-all flex items-center justify-center shadow-lg";
   
   return (
-    <div className="w-full h-full flex justify-center items-end pb-2 select-none touch-none">
+    <div className="w-full h-full flex justify-center items-center px-2 select-none touch-none">
         {/* NES Controller Container */}
-        <div className="relative w-full max-w-[600px] h-[180px] md:h-[220px] bg-gray-200 border-t-4 border-l-4 border-white border-b-4 border-r-4 border-gray-400 rounded-t-lg flex justify-between items-center px-4 md:px-12 shadow-2xl">
+        <div className="relative w-full max-w-[700px] h-full max-h-[160px] md:max-h-[180px] bg-gray-200 border-t-4 border-l-4 border-white border-b-4 border-r-4 border-gray-400 rounded-lg flex justify-between items-center px-4 md:px-12 shadow-2xl">
             
             {/* LEFT SIDE: D-PAD (CROSS) */}
-            <div className="relative w-32 h-32 md:w-40 md:h-40 flex-shrink-0">
+            <div className="relative w-28 h-28 md:w-32 md:h-32 flex-shrink-0">
                 {/* Center Block (Filler) */}
                 <div className="absolute top-1/3 left-1/3 w-1/3 h-1/3 bg-slate-800 z-10"></div>
 
@@ -87,8 +76,8 @@ const Controls: React.FC<ControlsProps> = ({ onAction, onReleaseBlock }) => {
                     onTouchStart={(e) => { e.preventDefault(); setIsUpHeld(true); }}
                     onTouchEnd={(e) => { e.preventDefault(); setIsUpHeld(false); }}
                 >
-                    <ChevronUp className="text-slate-400" size={24}/>
-                    <span className="absolute -top-4 text-[8px] font-bold text-slate-500">HEAD</span>
+                    <ChevronUp className="text-slate-400" size={20}/>
+                    <span className="absolute -top-3 text-[8px] font-bold text-slate-500">HEAD</span>
                 </button>
 
                 {/* LEFT (Dodge) */}
@@ -96,7 +85,7 @@ const Controls: React.FC<ControlsProps> = ({ onAction, onReleaseBlock }) => {
                     className={`${dpadBase} top-1/3 left-0 w-1/3 h-1/3 rounded-l-lg border-t-2 border-l-2 border-b-2 border-slate-600`}
                     onTouchStart={(e) => { e.preventDefault(); onAction(PlayerAction.DODGE_LEFT); }}
                 >
-                    <ChevronLeft className="text-slate-400" size={24}/>
+                    <ChevronLeft className="text-slate-400" size={20}/>
                 </button>
 
                 {/* RIGHT (Dodge) */}
@@ -104,7 +93,7 @@ const Controls: React.FC<ControlsProps> = ({ onAction, onReleaseBlock }) => {
                     className={`${dpadBase} top-1/3 right-0 w-1/3 h-1/3 rounded-r-lg border-t-2 border-r-2 border-b-2 border-slate-600`}
                     onTouchStart={(e) => { e.preventDefault(); onAction(PlayerAction.DODGE_RIGHT); }}
                 >
-                    <ChevronRight className="text-slate-400" size={24}/>
+                    <ChevronRight className="text-slate-400" size={20}/>
                 </button>
 
                 {/* DOWN (Block) */}
@@ -113,13 +102,13 @@ const Controls: React.FC<ControlsProps> = ({ onAction, onReleaseBlock }) => {
                     onTouchStart={(e) => { e.preventDefault(); onAction(PlayerAction.BLOCK); }}
                     onTouchEnd={(e) => { e.preventDefault(); onReleaseBlock(); }}
                 >
-                    <ChevronDown className="text-slate-400" size={24}/>
-                    <span className="absolute -bottom-4 text-[8px] font-bold text-slate-500">BLOCK</span>
+                    <ChevronDown className="text-slate-400" size={20}/>
+                    <span className="absolute -bottom-3 text-[8px] font-bold text-slate-500">BLOCK</span>
                 </button>
             </div>
 
             {/* MIDDLE: SELECT (DUCK) / START (STAR PUNCH) */}
-            <div className="flex gap-4 mt-8 md:mt-12">
+            <div className="flex gap-4">
                 <button 
                     className="flex flex-col items-center gap-1 active:opacity-75 focus:outline-none"
                     onTouchStart={(e) => { e.preventDefault(); onAction(PlayerAction.DUCK); }}
@@ -139,27 +128,27 @@ const Controls: React.FC<ControlsProps> = ({ onAction, onReleaseBlock }) => {
             </div>
 
             {/* RIGHT SIDE: ACTION BUTTONS (B/A Style) */}
-            <div className="relative w-40 h-32 md:w-48 md:h-40 flex items-end justify-end pb-2 md:pb-4 pr-2 gap-4 md:gap-6">
+            <div className="relative flex items-center justify-end gap-3 md:gap-5 pr-2">
                 {/* Button B (Left Punch) */}
-                <div className="flex flex-col items-center mb-[-10px]">
+                <div className="flex flex-col items-center">
                      <button 
                         className={`${actionBtnBase} bg-red-600 border-red-800 active:bg-red-700`}
                         onTouchStart={(e) => { e.preventDefault(); onAction(isUpHeld ? PlayerAction.PUNCH_LEFT_HEAD : PlayerAction.PUNCH_LEFT_BODY); }}
                     >
-                        <span className="text-white font-bold text-xl opacity-50">L</span>
+                        <span className="text-white font-bold text-lg opacity-60">L</span>
                     </button>
-                    <span className="font-bold text-slate-500 mt-2 text-sm">B</span>
+                    <span className="font-bold text-slate-500 mt-1 text-xs">B</span>
                 </div>
 
                 {/* Button A (Right Punch) */}
-                <div className="flex flex-col items-center mb-[20px]">
+                <div className="flex flex-col items-center">
                     <button 
                         className={`${actionBtnBase} bg-red-600 border-red-800 active:bg-red-700`}
                         onTouchStart={(e) => { e.preventDefault(); onAction(isUpHeld ? PlayerAction.PUNCH_RIGHT_HEAD : PlayerAction.PUNCH_RIGHT_BODY); }}
                     >
-                        <span className="text-white font-bold text-xl opacity-50">R</span>
+                        <span className="text-white font-bold text-lg opacity-60">R</span>
                     </button>
-                    <span className="font-bold text-slate-500 mt-2 text-sm">A</span>
+                    <span className="font-bold text-slate-500 mt-1 text-xs">A</span>
                 </div>
             </div>
 
