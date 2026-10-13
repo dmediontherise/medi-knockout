@@ -96,6 +96,8 @@ export const useGameLoop = () => {
   // Transition timer (in integer frames)
   const transitionTimerRef = useRef<number>(0);
   const nextTransitionStateRef = useRef<GameState | null>(null);
+  // ROUND_START sub-stage: 0 = "ROUND n", 1 = "READY?", 2 = "FIGHT!"
+  const roundStartStageRef = useRef<number>(0);
 
   // Visual/Feedback state
   const [feedbackMessage, setFeedbackMessage] = useState<string | null>(null);
@@ -327,18 +329,37 @@ export const useGameLoop = () => {
             nextTransitionStateRef.current = null;
             setGameState(nextState);
 
+            const isFast = typeof window !== 'undefined' && (
+              window.location.search.includes('skip_entrance') ||
+              window.location.search.includes('test')
+            );
+
             if (nextState === GameState.ROUND_START) {
-              setFeedbackMessage('READY?');
-              const isFast = typeof window !== 'undefined' && (
-                window.location.search.includes('skip_entrance') ||
-                window.location.search.includes('test')
-              );
-              feedbackTimerRef.current = isFast ? 5 : 120;
-              soundEngine.playReady();
-              transitionTimerRef.current = isFast ? 5 : 120;
-              nextTransitionStateRef.current = GameState.PLAYING;
+              // Sequence: "ROUND n" -> "READY?" -> "FIGHT!" (canvas message bar)
+              const stage = roundStartStageRef.current;
+              if (stage === 0) {
+                const round = engineStateRef.current.round;
+                engineStateRef.current = { ...engineStateRef.current, feedbackMessage: `ROUND ${round}` };
+                feedbackTimerRef.current = isFast ? 5 : 120;
+                soundEngine.playReady();
+                transitionTimerRef.current = isFast ? 5 : 60;
+                nextTransitionStateRef.current = GameState.ROUND_START;
+                roundStartStageRef.current = 1;
+              } else if (stage === 1) {
+                engineStateRef.current = { ...engineStateRef.current, feedbackMessage: 'READY?' };
+                feedbackTimerRef.current = isFast ? 5 : 60;
+                transitionTimerRef.current = isFast ? 5 : 60;
+                nextTransitionStateRef.current = GameState.ROUND_START;
+                roundStartStageRef.current = 2;
+              } else {
+                engineStateRef.current = { ...engineStateRef.current, feedbackMessage: 'FIGHT!' };
+                feedbackTimerRef.current = isFast ? 5 : 60;
+                transitionTimerRef.current = isFast ? 5 : 60;
+                nextTransitionStateRef.current = GameState.PLAYING;
+                roundStartStageRef.current = 0;
+              }
             } else if (nextState === GameState.PLAYING) {
-              setFeedbackMessage('FIGHT!');
+              engineStateRef.current = { ...engineStateRef.current, feedbackMessage: 'FIGHT!' };
               feedbackTimerRef.current = 60;
               soundEngine.playFight();
               soundEngine.playFightTheme();

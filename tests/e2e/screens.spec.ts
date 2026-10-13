@@ -153,7 +153,24 @@ test.describe('Presentation screens e2e (Task 009 Req 11)', () => {
     const canvas = page.locator('canvas.game-canvas');
     await expect(canvas).toBeVisible();
 
-    await page.waitForTimeout(100);
+    // Task 010 Req 12: capture on a visible blink frame of "PRESS START"
+    // (between-rounds blinks floor(frame/20) % 2 === 0; screenshotting a blink-off
+    // frame would miss the prompt entirely).
+    await page.waitForFunction(
+      () => {
+        const el = document.querySelector('canvas.game-canvas') as HTMLCanvasElement | null;
+        const ctx = el?.getContext('2d');
+        if (!ctx) return false;
+        const img = ctx.getImageData(84, 212, 88, 8).data;
+        for (let i = 0; i < img.length; i += 4) {
+          // NES 0x28 => rgb(0xbc, 0xbe, 0x00)
+          if (img[i] === 0xbc && img[i + 1] === 0xbe && img[i + 2] === 0x00) return true;
+        }
+        return false;
+      },
+      null,
+      { timeout: 5000 }
+    );
 
     const betweenRoundsPath = path.join(screensDir, 'between-rounds.png');
     await canvas.screenshot({ path: betweenRoundsPath });

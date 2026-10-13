@@ -167,4 +167,50 @@ describe('SoundEngine and Audio (Task 009 Req 10)', () => {
     expect(engine.isMuted()).toBe(false);
     expect(window.localStorage.setItem).toHaveBeenCalledWith('medi_knockout_muted', 'false');
   });
+
+  // Task 010 Requirement 1: the fight theme loops by rescheduling itself
+  it('R1: playFightTheme() reschedules a new oscillator loop after one theme length', () => {
+    vi.useFakeTimers();
+    try {
+      const engine = new SoundEngine();
+      engine.init();
+      engine.playFightTheme();
+
+      const initial = createdOscillators.length;
+      expect(initial).toBeGreaterThanOrEqual(32);
+
+      const maxStop = Math.max(...createdOscillators.map((o) => o.stop.mock.calls[0][0]));
+      expect(maxStop).toBeGreaterThanOrEqual(10.0);
+
+      vi.advanceTimersByTime(Math.ceil(maxStop * 1000) + 100);
+      expect(createdOscillators.length, 'loop rescheduled more notes').toBeGreaterThan(initial);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  // Task 010 Requirement 2: stopMusic() silences scheduled notes and prevents rescheduling
+  it('R2: stopMusic() stops every active music note and prevents further scheduling', () => {
+    vi.useFakeTimers();
+    try {
+      const engine = new SoundEngine();
+      engine.init();
+      engine.playFightTheme();
+
+      const active = createdOscillators.slice();
+      const stopsBefore = active.map((o) => o.stop.mock.calls.length);
+
+      engine.stopMusic();
+
+      for (let i = 0; i < active.length; i++) {
+        expect(active[i].stop.mock.calls.length, `oscillator ${i} stop called`).toBeGreaterThan(stopsBefore[i]);
+      }
+
+      const afterStop = createdOscillators.length;
+      vi.advanceTimersByTime(20000);
+      expect(createdOscillators.length, 'no new oscillators after stopMusic').toBe(afterStop);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
 });

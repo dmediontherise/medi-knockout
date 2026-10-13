@@ -1,7 +1,10 @@
 import { nesToRgba } from '../nesPalette';
 import { drawBitmapText, drawBitmapText2x } from '../sprites/font';
 import { blitSpriteCrop, CANVAS_WIDTH, CANVAS_HEIGHT } from '../sprites/blit';
-import { OPPONENT_PRESENTATION, CIRCUIT_ROSTER_IDS } from './presentationData';
+import { OPPONENT_PRESENTATION, CIRCUIT_ROSTER_IDS, getPortraitCrop } from './presentationData';
+
+// Footer instructions, split across two lines so they fit inside x 8-248 (0x20 white)
+export const CIRCUIT_FOOTER_LINES = ['UP/DOWN: SELECT', 'START/A: FIGHT'] as const;
 
 export function isOpponentUnlocked(
   oppId: string,
@@ -92,14 +95,15 @@ export function renderCircuitScreen(
     }
 
     if (isUnlocked && info) {
-      // Blit cropped portrait (32x32 from bust crop)
+      // Blit cropped portrait (32x32 head crop)
+      const crop = getPortraitCrop(oppId, 32);
       blitSpriteCrop(
         data,
         info.sprite,
         pX + 1,
         pY + 1,
-        info.portraitCrop.x,
-        info.portraitCrop.y,
+        crop.x,
+        crop.y,
         32,
         32,
         1
@@ -117,8 +121,9 @@ export function renderCircuitScreen(
     }
   }
 
-  // Footer instructions
-  drawBitmapText(setPixel, 'UP/DOWN: SELECT   START/A: FIGHT', 16, 224, 0x20);
+  // Footer instructions (split into two lines so nothing is cut off)
+  drawBitmapText(setPixel, CIRCUIT_FOOTER_LINES[0], 16, 220, 0x20);
+  drawBitmapText(setPixel, CIRCUIT_FOOTER_LINES[1], 16, 230, 0x20);
 
   ctx.putImageData(imgData, 0, 0);
 }

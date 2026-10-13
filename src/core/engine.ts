@@ -203,6 +203,13 @@ export function step(state: FightState, input: InputFrame): FightState {
   if (next.phase === 'KNOCKDOWN_COUNT') {
     next.referee.countFrameCounter++;
 
+    // Advance the down fighter's animation so the fall is visible during the count
+    if (next.referee.downFighter === 'OPPONENT') {
+      next.opponent.actionFrame++;
+    } else if (next.referee.downFighter === 'PLAYER') {
+      next.player.actionFrame++;
+    }
+
     // Process player mash input if player is down
     if (next.referee.downFighter === 'PLAYER' && effectiveInput.mash) {
       next.referee.playerMashCount++;

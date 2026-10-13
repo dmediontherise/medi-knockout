@@ -14,7 +14,6 @@ export interface OpponentPresentationInfo {
   quote: string;
   coachTip: string;
   sprite: SpriteData;
-  portraitCrop: { x: number; y: number; w: number; h: number };
 }
 
 export const OPPONENT_PRESENTATION: Record<string, OpponentPresentationInfo> = {
@@ -26,7 +25,6 @@ export const OPPONENT_PRESENTATION: Record<string, OpponentPresentationInfo> = {
     quote: '"BOUNTY ON YOUR HEAD!"',
     coachTip: 'WATCH FOR HIS BOUNTYGATE 3-HIT COMBO! DUCK THE JAB, DODGE THE HOOK!',
     sprite: IDLE_BASE_AINT_MAN,
-    portraitCrop: { x: 25, y: 15, w: 55, h: 55 },
   },
   medi_jinx: {
     id: 'medi_jinx',
@@ -36,7 +34,6 @@ export const OPPONENT_PRESENTATION: Record<string, OpponentPresentationInfo> = {
     quote: '"BOOK IT! YOU CANNOT WIN!"',
     coachTip: 'WHEN HE CALLS BOOK IT, HIS UPPERCUT IS BLINDINGLY FAST! DUCK IT!',
     sprite: IDLE_BASE_MEDI_JINX,
-    portraitCrop: { x: 25, y: 15, w: 55, h: 55 },
   },
   dj_tito: {
     id: 'dj_tito',
@@ -46,7 +43,6 @@ export const OPPONENT_PRESENTATION: Record<string, OpponentPresentationInfo> = {
     quote: '"RUN IT BACK! FEEL THE BEAT!"',
     coachTip: 'RUN IT BACK FLIPS YOUR CONTROLS! PUSH THE OPPOSITE WAY TO DODGE!',
     sprite: IDLE_BASE_DJ_TITO,
-    portraitCrop: { x: 25, y: 15, w: 55, h: 55 },
   },
   mr_yankee: {
     id: 'mr_yankee',
@@ -56,7 +52,6 @@ export const OPPONENT_PRESENTATION: Record<string, OpponentPresentationInfo> = {
     quote: '"PINSTRIPES NEVER LOSE!"',
     coachTip: 'PINSTRIPE SPECIAL LANDS 5 RAPID HITS! DODGE REPEATEDLY TO PUNISH HIM!',
     sprite: IDLE_BASE_MR_YANKEE,
-    portraitCrop: { x: 25, y: 15, w: 55, h: 55 },
   },
   maga_man: {
     id: 'maga_man',
@@ -66,8 +61,85 @@ export const OPPONENT_PRESENTATION: Record<string, OpponentPresentationInfo> = {
     quote: '"STOP THE COUNT! BIG LIE!"',
     coachTip: 'DURING BIG LIE, YOUR PUNCHES HURT YOURSELF! WAIT FOR IT TO EXPIRE!',
     sprite: IDLE_BASE_MAGA_MAN,
-    portraitCrop: { x: 25, y: 15, w: 55, h: 55 },
   },
 };
 
 export const CIRCUIT_ROSTER_IDS = ['aint_man', 'medi_jinx', 'dj_tito', 'mr_yankee', 'maga_man'];
+
+function isOpaqueChar(ch: string | undefined): boolean {
+  return !!ch && ch !== '.' && ch !== ' ';
+}
+
+// Build a square portrait crop that shows the character's head:
+// the top of the crop is the sprite's first opaque row, horizontally centred
+// on the opaque pixels of the sprite's first 24 rows.
+export function computePortraitCrop(
+  sprite: SpriteData,
+  size: number
+): { x: number; y: number; w: number; h: number } {
+  let firstOpaque = -1;
+  for (let y = 0; y < sprite.height; y++) {
+    const row = sprite.rows[y];
+    if (row && row.split('').some((c) => c !== '.' && c !== ' ')) {
+      firstOpaque = y;
+      break;
+    }
+  }
+  if (firstOpaque < 0) firstOpaque = 0;
+
+  let minX = sprite.width;
+  let maxX = -1;
+  const scanRows = Math.min(sprite.height, 24);
+  for (let y = 0; y < scanRows; y++) {
+    const row = sprite.rows[y];
+    if (!row) continue;
+    for (let x = 0; x < sprite.width; x++) {
+      const c = row[x];
+      if (c && c !== '.' && c !== ' ') {
+        if (x < minX) minX = x;
+        if (x > maxX) maxX = x;
+      }
+    }
+  }
+  if (maxX < 0) {
+    minX = 0;
+    maxX = sprite.width - 1;
+  }
+
+  const centerX = Math.floor((minX + maxX) / 2);
+  let cropX = centerX - Math.floor(size / 2);
+  if (cropX < 0) cropX = 0;
+  if (cropX + size > sprite.width) cropX = Math.max(0, sprite.width - size);
+
+  let cropY = firstOpaque;
+  if (cropY + size > sprite.height) cropY = Math.max(0, sprite.height - size);
+
+  return { x: cropX, y: cropY, w: size, h: size };
+}
+
+// Compute the head portrait crop for an opponent at a given square size.
+export function getPortraitCrop(
+  oppId: string,
+  size: number
+): { x: number; y: number; w: number; h: number } {
+  const info = OPPONENT_PRESENTATION[oppId];
+  if (!info) return { x: 0, y: 0, w: size, h: size };
+  return computePortraitCrop(info.sprite, size);
+}
+
+// Wrap text into lines of at most maxChars characters (word boundaries).
+export function wrapText(text: string, maxChars: number): string[] {
+  const words = text.split(' ');
+  const lines: string[] = [];
+  let curLine = '';
+  for (const w of words) {
+    if ((curLine + (curLine ? ' ' : '') + w).length <= maxChars) {
+      curLine = curLine + (curLine ? ' ' : '') + w;
+    } else {
+      if (curLine) lines.push(curLine);
+      curLine = w;
+    }
+  }
+  if (curLine) lines.push(curLine);
+  return lines;
+}

@@ -13,8 +13,21 @@ import {
 import { getPlayerSprite, PLAYER_BACK_IDLE } from '../../src/render/sprites/player';
 import { REFEREE_SPRITES, getLargeCountDigitSprite } from '../../src/render/sprites/referee';
 import { SpriteData } from '../../src/render/sprites/types';
-import { renderFrame, CANVAS_WIDTH, CANVAS_HEIGHT } from '../../src/render/renderFrame';
-import { drawBitmapText } from '../../src/render/sprites/font';
+import { renderFrame, CANVAS_WIDTH, CANVAS_HEIGHT, COUNT_DIGIT_X, COUNT_DIGIT_Y } from '../../src/render/renderFrame';
+import { nesToRgba } from '../../src/render/nesPalette';
+import {
+  renderCircuitScreen,
+  isOpponentUnlocked,
+  CIRCUIT_FOOTER_LINES,
+} from '../../src/render/screens/circuit';
+import { renderResultsScreen } from '../../src/render/screens/results';
+import {
+  OPPONENT_PRESENTATION,
+  CIRCUIT_ROSTER_IDS,
+  getPortraitCrop,
+  wrapText,
+} from '../../src/render/screens/presentationData';
+import { drawBitmapText, FONT_8X8 } from '../../src/render/sprites/font';
 import { createFight } from '../../src/core/engine';
 import { IDLE_BASE_AINT_MAN } from '../../src/render/sprites/generated/aint_man';
 import { IDLE_BASE_MEDI_JINX } from '../../src/render/sprites/generated/medi_jinx';
@@ -681,6 +694,229 @@ describe('Character Sprite Palettes and Dimensions', () => {
         expect(OPPONENT_POSES['TELL_UPPERCUT_LEFT'].dy).toBeGreaterThanOrEqual(14);
       }
     });
+  });
+});
+
+// Requirement 4: exact circuit lock rule + 5 opponent rows
+describe('Task 010 R4: circuit opponent lock and rows', () => {
+  it('isOpponentUnlocked is false after the unlocked index, true at/earlier, true for all with unlockAll', () => {
+    const unlockedIndex = 2;
+    for (let i = 0; i < CIRCUIT_ROSTER_IDS.length; i++) {
+      const id = CIRCUIT_ROSTER_IDS[i];
+      expect(isOpponentUnlocked(id, unlockedIndex, false), `${id} locked`).toBe(i <= unlockedIndex);
+      expect(isOpponentUnlocked(id, unlockedIndex, true), `${id} all unlocked`).toBe(true);
+    }
+  });
+
+  it('circuit screen draws 5 opponent rows (5th row region differs from background)', () => {
+    const b = new Uint8ClampedArray(CANVAS_WIDTH * CANVAS_HEIGHT * 4);
+    const ctx = {
+      createImageData: (w: number, h: number) => ({ width: w, height: h, data: b }),
+      putImageData: (imgData: any) => { b.set(imgData.data); },
+    } as unknown as CanvasRenderingContext2D;
+
+    renderCircuitScreen(ctx, 0, 4, true, 0);
+
+    // Rows start at y=30 with ~38px spacing; 5th row (i=4) occupies ~y182..216.
+    const bg = nesToRgba(0x02);
+    let nonBg = 0;
+    for (let y = 180; y < 218; y++) {
+      for (let x = 20; x < 220; x++) {
+        const i = (y * CANVAS_WIDTH + x) * 4;
+        if (b[i] !== bg[0] || b[i + 1] !== bg[1] || b[i + 2] !== bg[2]) nonBg++;
+      }
+    }
+    expect(nonBg, '5th opponent row draws content').toBeGreaterThan(100);
+  });
+});
+
+// Requirement 5: result headline/banner
+describe('Task 010 R5: result labels', () => {
+  function resultState(result: string, winner: string) {
+    const s: any = createFight('aint_man', 1);
+    s.phase = 'MATCH_OVER';
+    s.result = result;
+    s.winner = winner;
+    s.player.points = 1234;
+    s.opponent.points = 567;
+    return s;
+  }
+
+  function renderState(state: any): Uint8ClampedArray {
+    const b = new Uint8ClampedArray(CANVAS_WIDTH * CANVAS_HEIGHT * 4);
+    const c = {
+      createImageData: (w: number, h: number) => ({ width: w, height: h, data: b }),
+      putImageData: (imgData: any) => { b.set(imgData.data); },
+    } as unknown as CanvasRenderingContext2D;
+    renderResultsScreen(c, state, 0);
+    return b;
+  }
+
+  function diffRegion(a: Uint8ClampedArray, b: Uint8ClampedArray, y0: number, y1: number): number {
+    let diff = 0;
+    for (let y = y0; y < y1; y++) {
+      for (let x = 0; x < CANVAS_WIDTH; x++) {
+        const i = (y * CANVAS_WIDTH + x) * 4;
+        if (a[i] !== b[i] || a[i + 1] !== b[i + 1] || a[i + 2] !== b[i + 2]) diff++;
+      }
+    }
+    return diff;
+  }
+
+  it('headline region differs between KO, TKO and DECISION', () => {
+    const ko = renderState(resultState('KO', 'PLAYER'));
+    const tko = renderState(resultState('TKO', 'PLAYER'));
+    const dec = renderState(resultState('DECISION', 'PLAYER'));
+    expect(diffRegion(ko, tko, 24, 48), 'KO vs TKO headline').toBeGreaterThan(0);
+    expect(diffRegion(ko, dec, 24, 48), 'KO vs DECISION headline').toBeGreaterThan(0);
+    expect(diffRegion(tko, dec, 24, 48), 'TKO vs DECISION headline').toBeGreaterThan(0);
+  });
+
+  it('winner banner region differs between win and loss', () => {
+    const win = renderState(resultState('KO', 'PLAYER'));
+    const loss = renderState(resultState('KO', 'OPPONENT'));
+    expect(diffRegion(win, loss, 60, 88), 'winner banner win vs loss').toBeGreaterThan(0);
+  });
+});
+
+// Requirement 8: count digit comes from state.referee.count and is drawn on top
+describe('Task 010 R8: knockdown count digit', () => {
+  function renderState(state: any): Uint8ClampedArray {
+    const b = new Uint8ClampedArray(CANVAS_WIDTH * CANVAS_HEIGHT * 4);
+    const c = {
+      createImageData: (w: number, h: number) => ({ width: w, height: h, data: b }),
+      putImageData: (imgData: any) => { b.set(imgData.data); },
+    } as unknown as CanvasRenderingContext2D;
+    renderFrame(c, state);
+    return b;
+  }
+
+  it('draws the count digit at COUNT_DIGIT_X/Y using state.referee.count, on top of everything', () => {
+    const state = createFight('aint_man', 123);
+    state.phase = 'KNOCKDOWN_COUNT';
+    state.referee.count = 3;
+    state.referee.downFighter = 'OPPONENT';
+    state.opponent.action = 'KNOCKED_DOWN';
+    state.opponent.actionFrame = 60;
+    state.feedbackMessage = 'DOWN!'; // exercises the message bar overlap
+
+    const buffer = renderState(state);
+    const digit = getLargeCountDigitSprite(3);
+    const expected = nesToRgba(0x38);
+    let opaque = 0;
+    for (let sy = 0; sy < digit.height; sy++) {
+      const row = digit.rows[sy];
+      for (let sx = 0; sx < digit.width; sx++) {
+        const ch = row[sx];
+        if (ch === '.' || ch === ' ') continue;
+        opaque++;
+        const i = ((COUNT_DIGIT_Y + sy) * CANVAS_WIDTH + COUNT_DIGIT_X + sx) * 4;
+        expect(buffer[i], `digit px (${sx},${sy}) R`).toBe(expected[0]);
+        expect(buffer[i + 1], `digit px (${sx},${sy}) G`).toBe(expected[1]);
+        expect(buffer[i + 2], `digit px (${sx},${sy}) B`).toBe(expected[2]);
+      }
+    }
+    expect(opaque, 'digit has opaque pixels').toBeGreaterThan(30);
+  });
+
+  it('does not draw a count digit when referee.count is 0', () => {
+    const state = createFight('aint_man', 123);
+    state.phase = 'KNOCKDOWN_COUNT';
+    state.referee.count = 0;
+    state.referee.downFighter = 'OPPONENT';
+    state.opponent.action = 'KNOCKED_DOWN';
+    state.opponent.actionFrame = 5;
+
+    const buffer = renderState(state);
+    const expected = nesToRgba(0x38);
+    let digitPixels = 0;
+    for (const n of [1, 2, 3]) {
+      const digit = getLargeCountDigitSprite(n);
+      for (let sy = 0; sy < digit.height; sy++) {
+        for (let sx = 0; sx < digit.width; sx++) {
+          const ch = digit.rows[sy][sx];
+          if (ch === '.' || ch === ' ') continue;
+          const i = ((COUNT_DIGIT_Y + sy) * CANVAS_WIDTH + COUNT_DIGIT_X + sx) * 4;
+          if (buffer[i] === expected[0] && buffer[i + 1] === expected[1] && buffer[i + 2] === expected[2]) digitPixels++;
+        }
+      }
+    }
+    expect(digitPixels, 'no digit pixels when count is 0').toBe(0);
+  });
+});
+
+// Requirement 10: readable portraits
+describe('Task 010 R10: readable head portraits', () => {
+  for (const oppId of CIRCUIT_ROSTER_IDS) {
+    it(`${oppId} 32x32 circuit portrait is >= 45% opaque with pixels in the top rows`, () => {
+      const info = OPPONENT_PRESENTATION[oppId];
+      const crop = getPortraitCrop(oppId, 32);
+      let opaque = 0;
+      for (let y = 0; y < 32; y++) {
+        for (let x = 0; x < 32; x++) {
+          const ch = info.sprite.rows[crop.y + y]?.[crop.x + x];
+          if (ch && ch !== '.' && ch !== ' ') opaque++;
+        }
+      }
+      expect(opaque).toBeGreaterThanOrEqual(Math.ceil(0.45 * 32 * 32));
+
+      let topOpaque = 0;
+      for (let y = 0; y < 4; y++) {
+        for (let x = 0; x < 32; x++) {
+          const ch = info.sprite.rows[crop.y + y]?.[crop.x + x];
+          if (ch && ch !== '.' && ch !== ' ') topOpaque++;
+        }
+      }
+      expect(topOpaque).toBeGreaterThan(0);
+    });
+
+    it(`${oppId} 48x48 intro portrait is >= 45% opaque`, () => {
+      const info = OPPONENT_PRESENTATION[oppId];
+      const crop = getPortraitCrop(oppId, 48);
+      let opaque = 0;
+      for (let y = 0; y < 48; y++) {
+        for (let x = 0; x < 48; x++) {
+          const ch = info.sprite.rows[crop.y + y]?.[crop.x + x];
+          if (ch && ch !== '.' && ch !== ' ') opaque++;
+        }
+      }
+      expect(opaque).toBeGreaterThanOrEqual(Math.ceil(0.45 * 48 * 48));
+    });
+  }
+});
+
+// Requirement 11: text fits on screen
+describe('Task 010 R11: presentation text fits within x 8-248', () => {
+  // Compute each string's pixel width from the font: drawBitmapText advances 8px per char.
+  function glyphWidth(ch: string): number {
+    const glyph = FONT_8X8[ch.toUpperCase()] || FONT_8X8[' '];
+    let w = 0;
+    for (const row of glyph) if (row.length > w) w = row.length;
+    return w;
+  }
+  function width(text: string): number {
+    let w = 0;
+    for (const ch of text) w += glyphWidth(ch);
+    return w;
+  }
+
+  for (const oppId of CIRCUIT_ROSTER_IDS) {
+    it(`${oppId} quote (wrapped), hometown and coach tip (wrapped) fit`, () => {
+      const info = OPPONENT_PRESENTATION[oppId];
+      for (const line of wrapText(info.quote, 28)) {
+        expect(20 + width(line), `quote line "${line}"`).toBeLessThanOrEqual(248);
+      }
+      expect(20 + width(`FROM:   ${info.hometown}`)).toBeLessThanOrEqual(248);
+      for (const line of wrapText(info.coachTip, 26)) {
+        expect(24 + width(line), `coach tip line "${line}"`).toBeLessThanOrEqual(248);
+      }
+    });
+  }
+
+  it('circuit footer lines fit', () => {
+    for (const line of CIRCUIT_FOOTER_LINES) {
+      expect(16 + width(line), `footer "${line}"`).toBeLessThanOrEqual(248);
+    }
   });
 });
 

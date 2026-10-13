@@ -1,7 +1,7 @@
 import { nesToRgba } from '../nesPalette';
 import { drawBitmapText, drawBitmapText2x } from '../sprites/font';
 import { blitSpriteCrop, CANVAS_WIDTH, CANVAS_HEIGHT } from '../sprites/blit';
-import { OPPONENT_PRESENTATION } from './presentationData';
+import { OPPONENT_PRESENTATION, getPortraitCrop, wrapText } from './presentationData';
 
 export function renderIntroScreen(
   ctx: CanvasRenderingContext2D,
@@ -42,12 +42,11 @@ export function renderIntroScreen(
     setPixel(CANVAS_WIDTH - 7, y, 0x28);
   }
 
-  // Large portrait on left side (scaled 1.5x or 1x bust crop)
-  // 55x55 bust crop drawn at x: 16, y: 32 inside a frame
+  // Large head portrait: a 48x48 crop of the idle sprite drawn at 1x
   const portX = 16;
   const portY = 24;
-  const portW = 60;
-  const portH = 64;
+  const portW = 52;
+  const portH = 52;
 
   // Portrait box border
   for (let px = portX; px < portX + portW; px++) {
@@ -59,15 +58,16 @@ export function renderIntroScreen(
     setPixel(portX + portW - 1, py, 0x20);
   }
 
+  const crop = getPortraitCrop(oppId, 48);
   blitSpriteCrop(
     data,
     info.sprite,
     portX + 2,
     portY + 2,
-    info.portraitCrop.x,
-    info.portraitCrop.y,
-    portW - 4,
-    portH - 4,
+    crop.x,
+    crop.y,
+    48,
+    48,
     1
   );
 
@@ -81,7 +81,10 @@ export function renderIntroScreen(
   drawBitmapText(setPixel, `FROM:   ${info.hometown}`, 20, infoStartY, 0x20);
   drawBitmapText(setPixel, `RECORD: ${info.record}`, 20, infoStartY + 14, 0x30);
   drawBitmapText(setPixel, `QUOTE:`, 20, infoStartY + 28, 0x28);
-  drawBitmapText(setPixel, info.quote, 20, infoStartY + 40, 0x20);
+  const quoteLines = wrapText(info.quote, 28);
+  for (let li = 0; li < quoteLines.length; li++) {
+    drawBitmapText(setPixel, quoteLines[li], 20, infoStartY + 40 + li * 10, 0x20);
+  }
 
   // Divider line
   for (let x = 20; x < CANVAS_WIDTH - 20; x++) {

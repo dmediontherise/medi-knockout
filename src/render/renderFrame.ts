@@ -10,6 +10,10 @@ import { SPARK_SPRITE, STAR_SPRITE } from './sprites/effects';
 export const CANVAS_WIDTH = 256;
 export const CANVAS_HEIGHT = 240;
 
+// Knockdown count digit draw position (top-left of the 14x20 digit sprite)
+export const COUNT_DIGIT_X = 122;
+export const COUNT_DIGIT_Y = 60;
+
 // Internal frame buffer (256 * 240 * 4 bytes)
 let pixelBuffer: ImageData | null = null;
 
@@ -168,15 +172,6 @@ export function renderFrame(
     const refSprite = inKnockdown ? REFEREE_SPRITES.COUNT : REFEREE_SPRITES.STAND;
     // Draw referee at left side of ring (x: 48, y: 88)
     blitSprite(data, refSprite, 48, 88);
-
-    if (inKnockdown) {
-      // Draw large count digits in center-top of ring (x: 120, y: 64)
-      // Knockdown count is based on state.opponent or player knockdowns or round frame
-      // Estimate count from 1..10
-      const countNum = Math.min(10, Math.floor((state.opponent.actionFrame || state.player.actionFrame || 0) / 60) + 1);
-      const digitSprite = getLargeCountDigitSprite(countNum);
-      blitSprite(data, digitSprite, 122, 60);
-    }
   }
 
   // 4. Draw Opponent
@@ -317,6 +312,13 @@ export function renderFrame(
 
     // Draw text in NES yellow/gold (0x28) or white (0x20)
     drawBitmapText2x(setMsgPixel, msg, startX, startY, 0x28);
+  }
+
+  // 8. Knockdown count digit (Requirement 8)
+  // Drawn last, from the real referee count, so nothing covers it.
+  if (state.phase === 'KNOCKDOWN_COUNT' && state.referee.count >= 1) {
+    const digitSprite = getLargeCountDigitSprite(state.referee.count);
+    blitSprite(data, digitSprite, COUNT_DIGIT_X, COUNT_DIGIT_Y);
   }
 
   // Blit final pixel buffer to canvas

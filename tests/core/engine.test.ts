@@ -587,6 +587,42 @@ describe('R8 knockdowns and counts', () => {
     expect(state.opponent.hp).toBe(Math.floor(state.opponent.maxHp * 0.4));
     expect(state.referee.downFighter).toBeNull();
   });
+
+  // Task 010 Requirement 7: the down fighter's actionFrame advances during KNOCKDOWN_COUNT
+  // so the renderer's fall progress (fallDy) actually grows while the referee counts.
+  it('R7: down fighter actionFrame advances >= 31 while phase stays KNOCKDOWN_COUNT (opponent)', () => {
+    let state = createFight('aint_man', 1);
+    state.opponent.hp = 5;
+    state.opponent.action = 'IDLE';
+    state.opponent.guard = 'LOW';
+
+    state = step(state, { punchLeftHead: true });
+    expect(state.phase).toBe('KNOCKDOWN_COUNT');
+    expect(state.opponent.action).toBe('KNOCKED_DOWN');
+    expect(state.opponent.actionFrame).toBe(0);
+
+    for (let f = 0; f < 31; f++) {
+      state = step(state, {});
+    }
+    expect(state.phase).toBe('KNOCKDOWN_COUNT');
+    expect(state.opponent.actionFrame).toBeGreaterThanOrEqual(31);
+  });
+
+  it('R7: down player actionFrame advances >= 31 while phase stays KNOCKDOWN_COUNT', () => {
+    let state = createFight('aint_man', 1);
+    state.phase = 'KNOCKDOWN_COUNT';
+    state.referee.downFighter = 'PLAYER';
+    state.referee.count = 0;
+    state.referee.countFrameCounter = 0;
+    state.player.action = 'KNOCKED_DOWN';
+    state.player.actionFrame = 0;
+
+    for (let f = 0; f < 31; f++) {
+      state = step(state, {});
+    }
+    expect(state.phase).toBe('KNOCKDOWN_COUNT');
+    expect(state.player.actionFrame).toBeGreaterThanOrEqual(31);
+  });
 });
 
 describe('R9 rounds and decisions', () => {
