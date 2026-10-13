@@ -1,8 +1,8 @@
 import { FightState } from '../core/types';
-import { NES_PALETTE, nesToRgba } from './nesPalette';
+import { nesToRgba } from './nesPalette';
 import { drawRingBackground } from './sprites/ring';
 import { drawBitmapText, drawBitmapText2x } from './sprites/font';
-import { getOpponentSprite, resolvePlayerSprite, OPPONENT_POSES, PLAYER_POSES } from './poses';
+import { getOpponentSprite, resolvePlayerSprite, OPPONENT_POSES, PLAYER_POSES, getSpriteAnchor } from './poses';
 import { REFEREE_SPRITES, getLargeCountDigitSprite } from './sprites/referee';
 import { SpriteData } from './sprites/types';
 import { SPARK_SPRITE, STAR_SPRITE } from './sprites/effects';
@@ -39,19 +39,11 @@ export function computePlayerDraw(state: FightState): { x: number; y: number; sp
     shakeX = sign * transform.shake;
   }
 
-  let fallDy = 0;
-  if (transform.fall) {
-    fallDy = Math.min(30, Math.floor(actionFrame * 1.5));
-  }
-
   const baseX = Math.round(128 - sprite.width / 2) + transform.dx + shakeX;
   const x = aside ? Math.max(baseX + PLAYER_STEP_ASIDE_SHIFT, PLAYER_STEP_ASIDE_MIN_X) : baseX;
-  const y = 168 + transform.dy + fallDy;
+  const y = 168 + transform.dy;
   return { x, y, sprite };
 }
-
-// Internal frame buffer (256 * 240 * 4 bytes)
-let pixelBuffer: ImageData | null = null;
 
 // Helper to blit a SpriteData into the canvas ImageData
 function blitSprite(
@@ -59,13 +51,11 @@ function blitSprite(
   sprite: SpriteData,
   destX: number,
   destY: number,
-  overrideColor?: number,
-  clipMaxY?: number
+  overrideColor?: number
 ) {
   for (let sy = 0; sy < sprite.height; sy++) {
     const py = destY + sy;
     if (py < 0 || py >= CANVAS_HEIGHT) continue;
-    if (clipMaxY !== undefined && py >= clipMaxY) continue;
     const row = sprite.rows[sy];
     if (!row) continue;
 
@@ -90,12 +80,6 @@ function blitSprite(
 }
 
 // Render HUD across top (y < 48)
-// Displays:
-// - Points (top left)
-// - Opponent HP bar (top)
-// - Player HP bar
-// - Hearts & Stars icon + counts
-// - Round and clock formatted as R<n> m:ss
 function renderHud(
   data: Uint8ClampedArray,
   state: FightState,
@@ -113,7 +97,6 @@ function renderHud(
   };
 
   // Top line 1: Points & Round Clock
-  // E.g. "000000        R1 3:00"
   const pointsStr = state.player.points.toString().padStart(6, '0');
   const clockSecs = Math.max(0, state.gameClockSeconds);
   const mins = Math.floor(clockSecs / 60);
@@ -124,7 +107,6 @@ function renderHud(
   drawBitmapText(setHudPixel, clockStr, 176, 4, 0x20);
 
   // Line 2: Opponent Name / Opponent Stamina Bar (y: 16)
-  // Opponent name or "ENEMY"
   drawBitmapText(setHudPixel, "OPPONENT", 8, 16, 0x28); // Gold text
 
   // Opponent HP bar (y: 16, x: 80..160)
@@ -145,7 +127,6 @@ function renderHud(
   }
 
   // Line 3: Player Hearts, Stars, Player Stamina Bar (y: 28)
-  // Hearts & Stars: "\x03" (heart) and "\x04" (star)
   const heartStr = `\x03${state.player.hearts.toString().padStart(2, '0')}`;
   const starStr = `\x04${state.player.stars}`;
   drawBitmapText(setHudPixel, heartStr, 8, 28, 0x16); // Red heart
@@ -174,6 +155,84 @@ function renderHud(
   for (let x = 0; x < CANVAS_WIDTH; x++) {
     setHudPixel(x, 47, 0x0F);
   }
+}
+
+export function computeOpponentDraw(
+  opponentId: string,
+  action: string,
+  actionFrame: number = 0,
+  frame: number = 0
+): { x: number; y: number; sprite: SpriteData; isHidden: boolean; effect: string } {
+  const oppTransform = OPPONENT_POSES[action] || OPPONENT_POSES['IDLE'];
+  const oppSprite = getOpponentSprite(opponentId, action, actionFrame);
+  const anchor = getSpriteAnchor(oppSprite);
+
+  const isDown = action === 'KNOCKED_DOWN' || action === 'KO';
+
+  // KO blink: from actionFrame 31, KO blinks: hidden on 4-frame windows, every other window
+  let isKoHidden = false;
+  if (action === 'KO' && actionFrame >= 31) {
+    const blinkWindow = Math.floor((actionFrame - 31) / 4);
+    if (blinkWindow % 2 === 1) {
+      isKoHidden = true;
+    }
+  }
+
+  // Taunt bounce: oscillate dy between 0 and -6 over a 16-frame period of actionFrame
+  let tauntBounceDy = 0;
+  if (action === 'TAUNT') {
+    const phase = actionFrame % 16;
+    if (phase < 8) {
+      tauntBounceDy = -Math.round((phase / 7) * 6);
+    } else {
+      tauntBounceDy = -Math.round(((15 - phase) / 7) * 6);
+    }
+  }
+
+  // Shake logic: function of actionFrame
+  let oppShakeX = 0;
+  if (oppTransform.shake > 0) {
+    const period = action === 'STUNNED' ? 8 : 4;
+    const sign = (Math.floor(actionFrame / (period / 2)) % 2 === 0) ? 1 : -1;
+    oppShakeX = sign * oppTransform.shake;
+  }
+
+  // Breathing offset: 1px vertical breathing on frame 30 window (global frame counter per R1)
+  const isBreathingFrame = Math.floor(frame / 30) % 2 === 1;
+  const breathingDy = (action === 'IDLE' && isBreathingFrame) ? 1 : 0;
+
+  let x: number;
+  let y: number;
+
+  if (isDown) {
+    if (actionFrame < 10) {
+      // frames 0-9: HIT frame moved up and back (dy -4)
+      const baseOppDy = oppTransform.dy;
+      x = Math.round(128 - anchor.headCenterX) + oppTransform.dx + oppShakeX;
+      y = 190 - oppSprite.height + 1 + baseOppDy - 4;
+    } else {
+      // frames 10+: lying frame with bottom row at y = 192 and center opaque x at 128 ± 4.
+      // Drops in from y-offset -12 over frames 10-15, with a 2 px bounce on frames 16-19, then rests.
+      let dropOffset = 0;
+      if (actionFrame >= 10 && actionFrame <= 15) {
+        dropOffset = Math.round(-12 * (1 - (actionFrame - 10) / 5));
+      } else if (actionFrame >= 16 && actionFrame <= 19) {
+        dropOffset = -2;
+      } else {
+        dropOffset = 0;
+      }
+
+      x = Math.round(128 - anchor.centerOpaqueX);
+      y = 192 - anchor.lastRow + dropOffset;
+    }
+  } else {
+    // Standing frames: bottom row at y = 190, head at x = 128 ± 2 + dx
+    const baseOppDy = action === 'TAUNT' ? 0 : oppTransform.dy;
+    x = Math.round(128 - anchor.headCenterX) + oppTransform.dx + oppShakeX;
+    y = 190 - oppSprite.height + 1 + baseOppDy + breathingDy + tauntBounceDy;
+  }
+
+  return { x, y, sprite: oppSprite, isHidden: isKoHidden, effect: oppTransform.effect };
 }
 
 export function renderFrame(
@@ -206,90 +265,36 @@ export function renderFrame(
 
   if (inKnockdown || isMatchOver) {
     const refSprite = inKnockdown ? REFEREE_SPRITES.COUNT : REFEREE_SPRITES.STAND;
-    // Draw referee at left side of ring (x: 48, y: 88)
     blitSprite(data, refSprite, 48, 88);
   }
 
   // 4. Draw Opponent
-  // Opponent sprite is 112-150px tall (e.g. 140px tall).
-  // Positioned below HUD (y >= 48) at y = 50, centered at x: 128 ± 8.
   const oppActionFrame = state.opponent.actionFrame || 0;
-  const oppTransform = OPPONENT_POSES[state.opponent.action] || OPPONENT_POSES['IDLE'];
-  const oppSprite = getOpponentSprite(state.opponentId, state.opponent.action, oppActionFrame);
+  const oppDraw = computeOpponentDraw(state.opponentId, state.opponent.action, oppActionFrame, frame);
 
-  // Fall logic: slide down over actionFrame 0-30 until at most its top 40 rows remain above ring floor (y=190)
-  let fallDy = 0;
-  if (oppTransform.fall) {
-    const fallProgress = Math.min(1, oppActionFrame / 30);
-    // 50 + 100 = 150 -> leaves top 40 rows above y=190
-    fallDy = Math.floor(fallProgress * 100);
-  }
-
-  // KO blink: from actionFrame 31, KO blinks: hidden on 4-frame windows, every other window
-  // e.g. [31, 34]: Math.floor((31-31)/4) = 0 (even -> visible), [35, 38]: 1 (odd -> hidden), etc.
-  let isKoHidden = false;
-  if (state.opponent.action === 'KO' && oppActionFrame >= 31) {
-    const blinkWindow = Math.floor((oppActionFrame - 31) / 4);
-    if (blinkWindow % 2 === 1) {
-      isKoHidden = true;
-    }
-  }
-
-  // Taunt bounce: oscillate dy between 0 and -6 over a 16-frame period of actionFrame
-  let tauntBounceDy = 0;
-  if (state.opponent.action === 'TAUNT') {
-    // Phase 0..15: 0..7 goes up 0 to -6, 8..15 goes back down -6 to 0
-    const phase = oppActionFrame % 16;
-    if (phase < 8) {
-      tauntBounceDy = -Math.round((phase / 7) * 6);
-    } else {
-      tauntBounceDy = -Math.round(((15 - phase) / 7) * 6);
-    }
-  }
-
-  // Shake logic: function of actionFrame
-  let oppShakeX = 0;
-  if (oppTransform.shake > 0) {
-    const period = state.opponent.action === 'STUNNED' ? 8 : 4;
-    const sign = (Math.floor(oppActionFrame / (period / 2)) % 2 === 0) ? 1 : -1;
-    oppShakeX = sign * oppTransform.shake;
-  }
-
-  // Breathing offset: 1px vertical breathing on frame 30 window (global frame counter per R1)
-  const isBreathingFrame = Math.floor(frame / 30) % 2 === 1;
-  const breathingDy = (state.opponent.action === 'IDLE' && isBreathingFrame) ? 1 : 0;
-
-  const baseOppDy = state.opponent.action === 'TAUNT' ? 0 : oppTransform.dy;
-  const oppX = Math.round(128 - oppSprite.width / 2) + oppTransform.dx + oppShakeX;
-  const oppY = 50 + baseOppDy + fallDy + breathingDy + tauntBounceDy;
-
-  if (!isKoHidden) {
-    // Star opportunity flash effect on opponent — only during live play, never on a
-    // fighter who is already going down (otherwise the fallen opponent renders as a
-    // solid white silhouette and loses his own colors).
+  if (!oppDraw.isHidden) {
     const starFlashActive =
       state.phase === 'ROUND_ACTIVE' &&
       state.opponent.action !== 'KNOCKED_DOWN' &&
       state.opponent.action !== 'KO';
     const oppOverride = (state.opponent.starOpportunity && flash && starFlashActive) ? 0x20 : undefined;
-    // Opponent is clipped at ring floor line (y < 190) per Requirement 12
-    blitSprite(data, oppSprite, oppX, oppY, oppOverride, 190);
+
+    blitSprite(data, oppDraw.sprite, oppDraw.x, oppDraw.y, oppOverride);
 
     // Opponent Effect Sprites (spark / stars)
-    if (oppTransform.effect === 'spark-head') {
-      blitSprite(data, SPARK_SPRITE, oppX + Math.floor(oppSprite.width / 2) - 4, oppY + 16);
-    } else if (oppTransform.effect === 'spark-body') {
-      blitSprite(data, SPARK_SPRITE, oppX + Math.floor(oppSprite.width / 2) - 4, oppY + 50);
-    } else if (oppTransform.effect === 'stars') {
-      // Circling stars above head using actionFrame
+    if (oppDraw.effect === 'spark-head') {
+      blitSprite(data, SPARK_SPRITE, oppDraw.x + Math.floor(oppDraw.sprite.width / 2) - 4, oppDraw.y + 16);
+    } else if (oppDraw.effect === 'spark-body') {
+      blitSprite(data, SPARK_SPRITE, oppDraw.x + Math.floor(oppDraw.sprite.width / 2) - 4, oppDraw.y + 50);
+    } else if (oppDraw.effect === 'stars') {
       const angle = (oppActionFrame * 0.15) % (Math.PI * 2);
-      const starX = oppX + Math.floor(oppSprite.width / 2) + Math.round(Math.cos(angle) * 16) - 4;
-      const starY = oppY + Math.round(Math.sin(angle) * 6) - 8;
+      const starX = oppDraw.x + Math.floor(oppDraw.sprite.width / 2) + Math.round(Math.cos(angle) * 16) - 4;
+      const starY = oppDraw.y + Math.round(Math.sin(angle) * 6) - 8;
       blitSprite(data, STAR_SPRITE, starX, starY);
     }
   }
 
-  // 5. Draw Player (Seen from behind, small at lower center overlapping opponent's lower body)
+  // 5. Draw Player
   const playerActionFrame = state.player.actionFrame || 0;
   const playerDraw = computePlayerDraw(state);
   const playerSprite = playerDraw.sprite;
@@ -298,22 +303,19 @@ export function renderFrame(
 
   blitSprite(data, playerSprite, playerX, playerY);
 
-  // 6. Hit feedback flash (white/red flash on hit, first 4 frames of actionFrame)
+  // 6. Hit feedback flash
   if (state.player.action === 'HIT' && playerActionFrame <= 3) {
     blitSprite(data, playerSprite, playerX, playerY, 0x20);
   }
 
-  // 7. In-fight canvas feedback messages (Requirement 10)
-  // When feedbackMessage is set during a fight, drawn in 8x8 font at 2x, centered, inside y 52-80 on a black backing bar
+  // 7. In-fight canvas feedback messages
   if (state.feedbackMessage) {
     const msg = state.feedbackMessage;
-    const charWidth = 16; // 8 * 2
+    const charWidth = 16;
     const textWidth = msg.length * charWidth;
-    const textHeight = 16; // 8 * 2
     const startX = Math.max(0, Math.round((CANVAS_WIDTH - textWidth) / 2));
-    const startY = 56; // Centered inside 52..80 (total height 28, text height 16, padding top/bot 6)
+    const startY = 56;
 
-    // Black backing bar
     const barPadX = 6;
     const barLeft = Math.max(0, startX - barPadX);
     const barRight = Math.min(CANVAS_WIDTH - 1, startX + textWidth + barPadX);
@@ -340,12 +342,10 @@ export function renderFrame(
       data[idx + 3] = 255;
     };
 
-    // Draw text in NES yellow/gold (0x28) or white (0x20)
     drawBitmapText2x(setMsgPixel, msg, startX, startY, 0x28);
   }
 
-  // 8. Knockdown count digit (Requirement 8)
-  // Drawn last, from the real referee count, so nothing covers it.
+  // 8. Knockdown count digit
   if (state.phase === 'KNOCKDOWN_COUNT' && state.referee.count >= 1) {
     const digitSprite = getLargeCountDigitSprite(state.referee.count);
     blitSprite(data, digitSprite, COUNT_DIGIT_X, COUNT_DIGIT_Y);

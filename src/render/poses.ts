@@ -1,10 +1,10 @@
 import { ActionType, OpponentActionType } from '../core/types';
 import { SpriteData, mirrorSprite } from './sprites/types';
-import { IDLE_BASE_AINT_MAN } from './sprites/generated/aint_man';
-import { IDLE_BASE_MEDI_JINX } from './sprites/generated/medi_jinx';
-import { IDLE_BASE_DJ_TITO } from './sprites/generated/dj_tito';
-import { IDLE_BASE_MR_YANKEE } from './sprites/generated/mr_yankee';
-import { IDLE_BASE_MAGA_MAN } from './sprites/generated/maga_man';
+import { IDLE_BASE_AINT_MAN, AINT_MAN_FRAMES } from './sprites/generated/aint_man';
+import { IDLE_BASE_MEDI_JINX, MEDI_JINX_FRAMES } from './sprites/generated/medi_jinx';
+import { IDLE_BASE_DJ_TITO, DJ_TITO_FRAMES } from './sprites/generated/dj_tito';
+import { IDLE_BASE_MR_YANKEE, MR_YANKEE_FRAMES } from './sprites/generated/mr_yankee';
+import { IDLE_BASE_MAGA_MAN, MAGA_MAN_FRAMES } from './sprites/generated/maga_man';
 import { getPlayerSprite, PLAYER_BACK_IDLE } from './sprites/player';
 import { toFlashPalette, toDarkPalette } from './nesPalette';
 
@@ -16,6 +16,98 @@ export const IDLE_BASES: Record<string, SpriteData> = {
   dj_tito: IDLE_BASE_DJ_TITO,
   mr_yankee: IDLE_BASE_MR_YANKEE,
   maga_man: IDLE_BASE_MAGA_MAN,
+};
+
+export const OPPONENT_FRAME_MAPS: Record<string, Record<number | string, SpriteData>> = {
+  aint_man: AINT_MAN_FRAMES,
+  medi_jinx: MEDI_JINX_FRAMES,
+  dj_tito: DJ_TITO_FRAMES,
+  mr_yankee: MR_YANKEE_FRAMES,
+  maga_man: MAGA_MAN_FRAMES,
+};
+
+// Action to figure index per Task 012 action -> figure map
+export const OPPONENT_ACTION_FIGURES: Record<string, Record<string, number | string>> = {
+  aint_man: {
+    IDLE: 0,
+    TELL_JAB: 3,
+    PUNCH_JAB: 4,
+    TELL_HOOK: 7,
+    PUNCH_HOOK: 6,
+    TELL_UPPERCUT: 12,
+    PUNCH_UPPERCUT: 11,
+    BLOCK_HIGH: 3,
+    BLOCK_LOW: 10,
+    HIT: 2,
+    STUNNED: 10,
+    KNOCKED_DOWN: 'LIE',
+    KO: 'LIE',
+    TAUNT: 13,
+  },
+  medi_jinx: {
+    IDLE: 0,
+    TELL_JAB: 6,
+    PUNCH_JAB: 2,
+    TELL_HOOK: 3,
+    PUNCH_HOOK: 1,
+    TELL_UPPERCUT: 5,
+    PUNCH_UPPERCUT: 9,
+    BLOCK_HIGH: 6,
+    BLOCK_LOW: 6,
+    HIT: 8,
+    STUNNED: 8,
+    KNOCKED_DOWN: 10,
+    KO: 10,
+    TAUNT: 4,
+  },
+  dj_tito: {
+    IDLE: 0,
+    TELL_JAB: 5,
+    PUNCH_JAB: 1,
+    TELL_HOOK: 6,
+    PUNCH_HOOK: 7,
+    TELL_UPPERCUT: 8,
+    PUNCH_UPPERCUT: 4,
+    BLOCK_HIGH: 5,
+    BLOCK_LOW: 8,
+    HIT: 9,
+    STUNNED: 9,
+    KNOCKED_DOWN: 11,
+    KO: 11,
+    TAUNT: 10,
+  },
+  mr_yankee: {
+    IDLE: 0,
+    TELL_JAB: 3,
+    PUNCH_JAB: 1,
+    TELL_HOOK: 7,
+    PUNCH_HOOK: 8,
+    TELL_UPPERCUT: 4,
+    PUNCH_UPPERCUT: 9,
+    BLOCK_HIGH: 5,
+    BLOCK_LOW: 7,
+    HIT: 3,
+    STUNNED: 3,
+    KNOCKED_DOWN: 10,
+    KO: 10,
+    TAUNT: 9,
+  },
+  maga_man: {
+    IDLE: 0,
+    TELL_JAB: 2,
+    PUNCH_JAB: 1,
+    TELL_HOOK: 7,
+    PUNCH_HOOK: 6,
+    TELL_UPPERCUT: 4,
+    PUNCH_UPPERCUT: 3,
+    BLOCK_HIGH: 2,
+    BLOCK_LOW: 7,
+    HIT: 2,
+    STUNNED: 0,
+    KNOCKED_DOWN: 10,
+    KO: 10,
+    TAUNT: 9,
+  },
 };
 
 export type PaletteEffect = 'normal' | 'flash' | 'dark';
@@ -31,7 +123,7 @@ export interface PoseTransform {
   fall: boolean;
 }
 
-// Transform table per requirement 1
+// Transform table per requirement 1 & 5
 export const OPPONENT_POSES: Record<OpponentActionType | string, PoseTransform> = {
   IDLE: {
     dx: 0,
@@ -60,10 +152,6 @@ export const OPPONENT_POSES: Record<OpponentActionType | string, PoseTransform> 
     shake: 0,
     fall: false,
   },
-  // Tells:
-  // - Jab tell: pull-back dy <= -3 and 'flash' palette on alternating 4-frame windows
-  // - Hook tell: lean |dx| >= 10 toward the hook side, plus flash
-  // - Uppercut tell: crouch dy >= 8, plus flash
   TELL_JAB_LEFT: {
     dx: -4,
     dy: -4,
@@ -118,8 +206,6 @@ export const OPPONENT_POSES: Record<OpponentActionType | string, PoseTransform> 
     shake: 0,
     fall: false,
   },
-  // Punches:
-  // lunge toward camera side: dy >= 4, dx toward punch side
   PUNCH_JAB_LEFT: {
     dx: -6,
     dy: 6,
@@ -174,7 +260,6 @@ export const OPPONENT_POSES: Record<OpponentActionType | string, PoseTransform> 
     shake: 0,
     fall: false,
   },
-  // Hits & States:
   HIT: {
     dx: 4,
     dy: -2,
@@ -197,19 +282,19 @@ export const OPPONENT_POSES: Record<OpponentActionType | string, PoseTransform> 
     dx: 0,
     dy: 0,
     flipX: false,
-    palette: 'dark',
+    palette: 'normal',
     effect: 'none',
     shake: 0,
-    fall: true,
+    fall: false,
   },
   KO: {
     dx: 0,
     dy: 0,
     flipX: false,
-    palette: 'dark',
+    palette: 'normal',
     effect: 'none',
     shake: 0,
-    fall: true,
+    fall: false,
   },
   TAUNT: {
     dx: 0,
@@ -222,7 +307,7 @@ export const OPPONENT_POSES: Record<OpponentActionType | string, PoseTransform> 
   },
 };
 
-// Player pose transforms per requirement 7
+// Player pose transforms
 export interface PlayerPoseTransform {
   dx: number;
   dy: number;
@@ -248,8 +333,8 @@ export const PLAYER_POSES: Record<ActionType | string, PlayerPoseTransform> = {
   UPPERCUT: { dx: 0, dy: -10, palette: 'normal', shake: 0, fall: false },
   STAR_PUNCH: { dx: 0, dy: -12, palette: 'flash', shake: 0, fall: false },
   HIT: { dx: 2, dy: 2, palette: 'flash', shake: 3, fall: false },
-  KNOCKED_DOWN: { dx: 0, dy: 0, palette: 'dark', shake: 0, fall: true },
-  KO: { dx: 0, dy: 0, palette: 'dark', shake: 0, fall: true },
+  KNOCKED_DOWN: { dx: 0, dy: 0, palette: 'dark', shake: 0, fall: false },
+  KO: { dx: 0, dy: 0, palette: 'dark', shake: 0, fall: false },
 };
 
 // Helper to apply palette effect ('flash' or 'dark') to a sprite
@@ -273,29 +358,110 @@ export function applyPaletteEffect(sprite: SpriteData, effect: PaletteEffect): S
   };
 }
 
+export interface OpponentAnchor {
+  headCenterX: number;
+  centerOpaqueX: number;
+  lastRow: number;
+}
+
+const anchorCache = new WeakMap<SpriteData, OpponentAnchor>();
+
+export function getSpriteAnchor(sprite: SpriteData): OpponentAnchor {
+  const cached = anchorCache.get(sprite);
+  if (cached) return cached;
+
+  const top25Rows = Math.floor(sprite.height * 0.25);
+  let sumTopX = 0;
+  let countTop = 0;
+  for (let y = 0; y < top25Rows; y++) {
+    const row = sprite.rows[y];
+    for (let x = 0; x < sprite.width; x++) {
+      if (row[x] !== '.' && row[x] !== ' ') {
+        sumTopX += x;
+        countTop++;
+      }
+    }
+  }
+  const headCenterX = countTop > 0 ? (sumTopX / countTop) : (sprite.width / 2);
+
+  let sumAllX = 0;
+  let countAll = 0;
+  let lastRow = -1;
+  for (let y = 0; y < sprite.height; y++) {
+    const row = sprite.rows[y];
+    for (let x = 0; x < sprite.width; x++) {
+      if (row[x] !== '.' && row[x] !== ' ') {
+        sumAllX += x;
+        countAll++;
+        if (y > lastRow) lastRow = y;
+      }
+    }
+  }
+  const centerOpaqueX = countAll > 0 ? (sumAllX / countAll) : (sprite.width / 2);
+
+  const anchor: OpponentAnchor = {
+    headCenterX,
+    centerOpaqueX,
+    lastRow: lastRow >= 0 ? lastRow : sprite.height - 1,
+  };
+  anchorCache.set(sprite, anchor);
+  return anchor;
+}
+
 export function getOpponentSprite(
   opponentId: string,
   action: OpponentActionType | string,
   actionFrame: number = 0
 ): SpriteData {
-  const base = IDLE_BASES[opponentId] || IDLE_BASES['aint_man'];
+  const charId = OPPONENT_FRAME_MAPS[opponentId] ? opponentId : 'aint_man';
+  const frames = OPPONENT_FRAME_MAPS[charId];
+  const figMap = OPPONENT_ACTION_FIGURES[charId] || OPPONENT_ACTION_FIGURES['aint_man'];
   const transform = OPPONENT_POSES[action] || OPPONENT_POSES['IDLE'];
+
+  // Determine base action key
+  const isRight = action.endsWith('_RIGHT');
+  let baseActionKey = action;
+  if (isRight) {
+    baseActionKey = action.replace('_RIGHT', '');
+  } else if (action.endsWith('_LEFT')) {
+    baseActionKey = action.replace('_LEFT', '');
+  }
+
+  // Knockdown / KO frame logic:
+  // On actionFrame 0-9, draw the HIT frame
+  // From actionFrame 10 on, draw the lying frame
+  let figKey: number | string;
+  if (action === 'KNOCKED_DOWN' || action === 'KO') {
+    if (actionFrame < 10) {
+      figKey = figMap['HIT'] ?? 2;
+    } else {
+      figKey = figMap['KNOCKED_DOWN'] ?? 'LIE';
+    }
+  } else {
+    figKey = figMap[baseActionKey] ?? figMap[action] ?? 0;
+  }
+
+  const baseSprite = frames[figKey] || frames[0] || IDLE_BASES[charId];
 
   // Flashing windows based on actionFrame
   let activePalette = transform.palette;
   if (action === 'TELL_JAB_LEFT' || action === 'TELL_JAB_RIGHT') {
-    // Flash on actionFrame 0-3, 8-11 and 16-19 (on/off in 4-frame windows from start of tell)
-    const isFlashWindow = (actionFrame >= 0 && actionFrame <= 3) ||
-                          (actionFrame >= 8 && actionFrame <= 11) ||
-                          (actionFrame >= 16 && actionFrame <= 19);
+    // Flash on actionFrame 0-3, 8-11 and 16-19
+    const isFlashWindow =
+      (actionFrame >= 0 && actionFrame <= 3) ||
+      (actionFrame >= 8 && actionFrame <= 11) ||
+      (actionFrame >= 16 && actionFrame <= 19);
     activePalette = isFlashWindow ? 'flash' : 'normal';
   } else if (action === 'HIT') {
     // Flash on actionFrame 0-3 only, then normal palette
     activePalette = (actionFrame >= 0 && actionFrame <= 3) ? 'flash' : 'normal';
+  } else if (action === 'KNOCKED_DOWN' || action === 'KO') {
+    // Flash on actionFrame 0-3 of HIT frame
+    activePalette = (actionFrame <= 3) ? 'flash' : 'normal';
   }
 
-  // Horizontal flip
-  let sprite = transform.flipX ? mirrorSprite(base) : base;
+  // Horizontal flip for _RIGHT
+  let sprite = (isRight || transform.flipX) ? mirrorSprite(baseSprite) : baseSprite;
 
   // Palette effect
   if (activePalette !== 'normal') {

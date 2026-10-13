@@ -67,13 +67,124 @@ function nearestNesLab(r, g, b, allowed = null, charId = '') {
   return bestIdx;
 }
 
-const CHARACTERS = [
-  { id: 'aint_man', file: 'public/assets/aint_man.jpg', crop: null, figBox: { x: 12, y: 5, w: 74, h: 99 }, targetH: 140, targetW: 105 },
-  { id: 'medi_jinx', file: 'public/assets/medi_jinx.jpg', crop: null, figBox: { x: 9, y: 10, w: 54, h: 105 }, targetH: 140, targetW: 76 },
-  { id: 'dj_tito', file: 'public/assets/dj_tito.jpg', crop: null, figBox: { x: 5, y: 10, w: 52, h: 112 }, targetH: 140, targetW: 72 },
-  { id: 'mr_yankee', file: 'public/assets/mr_yankee.jpg', crop: null, figBox: { x: 22, y: 7, w: 55, h: 113 }, targetH: 140, targetW: 72 },
-  { id: 'maga_man', file: 'public/assets/maga_man.jpg', crop: null, figBox: { x: 10, y: 8, w: 55, h: 111 }, targetH: 140, targetW: 72 },
-  { id: 'player', file: 'public/assets/player_sprites_raw.jpg', crop: { x: 512, y: 512, w: 512, h: 512 }, figBox: { x: 0, y: 16, w: 66, h: 111 }, targetH: 75, targetW: 50 }
+const FIGURE_BOXES = {
+  aint_man: [
+    [12, 7, 85, 103], [93, 7, 166, 103], [175, 7, 235, 104], [250, 7, 323, 103],
+    [9, 129, 89, 225], [95, 129, 174, 226], [178, 129, 257, 226], [260, 129, 327, 226],
+    [9, 257, 75, 352], [88, 257, 154, 352], [166, 257, 233, 352], [248, 255, 310, 352],
+    [8, 376, 80, 462], [85, 379, 166, 462]
+  ],
+  medi_jinx: [
+    [9, 10, 61, 113], [95, 10, 180, 114], [194, 10, 279, 113], [8, 129, 80, 235],
+    [104, 128, 177, 234], [200, 128, 271, 234], [11, 252, 76, 357], [98, 254, 179, 357],
+    [196, 252, 274, 352], [190, 362, 259, 462], [41, 398, 152, 462]
+  ],
+  dj_tito: [
+    [5, 10, 56, 121], [98, 19, 186, 121], [210, 19, 298, 121], [7, 143, 92, 246],
+    [98, 142, 170, 247], [180, 140, 255, 247], [264, 140, 316, 247], [7, 260, 90, 363],
+    [100, 262, 169, 359], [201, 266, 281, 353], [177, 360, 301, 460], [50, 385, 148, 460]
+  ],
+  mr_yankee: [
+    [22, 7, 76, 119], [110, 7, 203, 119], [220, 7, 313, 119], [10, 132, 103, 245],
+    [10, 247, 103, 356], [109, 132, 191, 244], [215, 132, 306, 244], [106, 250, 197, 356],
+    [216, 250, 322, 353], [209, 358, 291, 462], [42, 388, 168, 462]
+  ],
+  maga_man: [
+    [10, 8, 64, 118], [102, 8, 193, 119], [205, 8, 282, 119], [8, 136, 79, 243],
+    [104, 138, 178, 243], [200, 139, 287, 243], [11, 250, 97, 353], [105, 250, 180, 353],
+    [198, 253, 287, 353], [172, 359, 263, 461], [26, 394, 148, 461]
+  ]
+};
+
+const ACTION_MAP = {
+  aint_man: {
+    IDLE: 0,
+    TELL_JAB: 3,
+    PUNCH_JAB: 4,
+    TELL_HOOK: 7,
+    PUNCH_HOOK: 6,
+    TELL_UPPERCUT: 12,
+    PUNCH_UPPERCUT: 11,
+    BLOCK_HIGH: 3,
+    BLOCK_LOW: 10,
+    HIT: 2,
+    STUNNED: 10,
+    KNOCKED_DOWN: 'LIE',
+    KO: 'LIE',
+    TAUNT: 13,
+  },
+  medi_jinx: {
+    IDLE: 0,
+    TELL_JAB: 6,
+    PUNCH_JAB: 2,
+    TELL_HOOK: 3,
+    PUNCH_HOOK: 1,
+    TELL_UPPERCUT: 5,
+    PUNCH_UPPERCUT: 9,
+    BLOCK_HIGH: 6,
+    BLOCK_LOW: 6,
+    HIT: 8,
+    STUNNED: 8,
+    KNOCKED_DOWN: 10,
+    KO: 10,
+    TAUNT: 4,
+  },
+  dj_tito: {
+    IDLE: 0,
+    TELL_JAB: 5,
+    PUNCH_JAB: 1,
+    TELL_HOOK: 6,
+    PUNCH_HOOK: 7,
+    TELL_UPPERCUT: 8,
+    PUNCH_UPPERCUT: 4,
+    BLOCK_HIGH: 5,
+    BLOCK_LOW: 8,
+    HIT: 9,
+    STUNNED: 9,
+    KNOCKED_DOWN: 11,
+    KO: 11,
+    TAUNT: 10,
+  },
+  mr_yankee: {
+    IDLE: 0,
+    TELL_JAB: 3,
+    PUNCH_JAB: 1,
+    TELL_HOOK: 7,
+    PUNCH_HOOK: 8,
+    TELL_UPPERCUT: 4,
+    PUNCH_UPPERCUT: 9,
+    BLOCK_HIGH: 5,
+    BLOCK_LOW: 7,
+    HIT: 3,
+    STUNNED: 3,
+    KNOCKED_DOWN: 10,
+    KO: 10,
+    TAUNT: 9,
+  },
+  maga_man: {
+    IDLE: 0,
+    TELL_JAB: 2,
+    PUNCH_JAB: 1,
+    TELL_HOOK: 7,
+    PUNCH_HOOK: 6,
+    TELL_UPPERCUT: 4,
+    PUNCH_UPPERCUT: 3,
+    BLOCK_HIGH: 2,
+    BLOCK_LOW: 7,
+    HIT: 2,
+    STUNNED: 0,
+    KNOCKED_DOWN: 10,
+    KO: 10,
+    TAUNT: 9,
+  },
+};
+
+const OPPONENTS = [
+  { id: 'aint_man', file: 'public/assets/aint_man.jpg' },
+  { id: 'medi_jinx', file: 'public/assets/medi_jinx.jpg' },
+  { id: 'dj_tito', file: 'public/assets/dj_tito.jpg' },
+  { id: 'mr_yankee', file: 'public/assets/mr_yankee.jpg' },
+  { id: 'maga_man', file: 'public/assets/maga_man.jpg' },
 ];
 
 const OUT_DIR = 'src/render/sprites/generated';
@@ -84,10 +195,17 @@ if (!fs.existsSync(OUT_DIR)) {
 // Letter tokens for palette mapping in SpriteData
 const PALETTE_TOKENS = '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz';
 
-// Function to process an image box into quantized SpriteData
-async function processSpriteImage(img, box, targetW, targetH, charId) {
-  const cropped = img.clone().crop(box);
+// Function to process an image into quantized SpriteData
+async function processSpriteImage(img, box, targetW, targetH, charId, rotateCcw = false, fixedPalette = null) {
+  let cropped = img.clone().crop(box);
   cropped.resize({ w: targetW, h: targetH });
+  if (rotateCcw) {
+    // 90 deg counter-clockwise rotation
+    cropped.rotate(270);
+    const tempW = targetW;
+    targetW = targetH;
+    targetH = tempW;
+  }
 
   const isBgPixel = (x, y) => {
     const idx = (y * targetW + x) * 4;
@@ -147,42 +265,53 @@ async function processSpriteImage(img, box, targetW, targetH, charId) {
     }
   }
 
-  // Count colors perceptually
-  const colorCounts = new Map();
-  for (let y = 0; y < targetH; y++) {
-    for (let x = 0; x < targetW; x++) {
-      if (!isBg[y * targetW + x]) {
-        const idx = (y * targetW + x) * 4;
-        const r = cropped.bitmap.data[idx];
-        const g = cropped.bitmap.data[idx + 1];
-        const b = cropped.bitmap.data[idx + 2];
-        const nes = nearestNesLab(r, g, b, null, charId);
-        colorCounts.set(nes, (colorCounts.get(nes) || 0) + 1);
+  let top12;
+  let paletteMap;
+
+  if (fixedPalette) {
+    paletteMap = fixedPalette;
+    top12 = Object.entries(fixedPalette)
+      .filter(([k]) => k !== '.')
+      .sort((a, b) => a[0].localeCompare(b[0]))
+      .map(([_, v]) => v);
+  } else {
+    // Count colors perceptually
+    const colorCounts = new Map();
+    for (let y = 0; y < targetH; y++) {
+      for (let x = 0; x < targetW; x++) {
+        if (!isBg[y * targetW + x]) {
+          const idx = (y * targetW + x) * 4;
+          const r = cropped.bitmap.data[idx];
+          const g = cropped.bitmap.data[idx + 1];
+          const b = cropped.bitmap.data[idx + 2];
+          const nes = nearestNesLab(r, g, b, null, charId);
+          colorCounts.set(nes, (colorCounts.get(nes) || 0) + 1);
+        }
       }
     }
-  }
 
-  // Ensure key characteristic colors are included in the top 12
-  if (charId === 'aint_man' && !colorCounts.has(0x28) && !colorCounts.has(0x38) && !colorCounts.has(0x37)) {
-    colorCounts.set(0x37, 500);
-  }
-  if (charId === 'medi_jinx' && !colorCounts.has(0x11) && !colorCounts.has(0x12) && !colorCounts.has(0x21) && !colorCounts.has(0x22)) {
-    colorCounts.set(0x11, 500);
-  }
-  if (colorCounts.has(0x08) && (charId === 'medi_jinx' || charId === 'dj_tito')) {
-    colorCounts.delete(0x08);
-  }
-  if (colorCounts.has(0x18) && (charId === 'medi_jinx' || charId === 'dj_tito')) {
-    colorCounts.delete(0x18);
-  }
+    // Ensure key characteristic colors are included in the top 12
+    if (charId === 'aint_man' && !colorCounts.has(0x28) && !colorCounts.has(0x38) && !colorCounts.has(0x37)) {
+      colorCounts.set(0x37, 500);
+    }
+    if (charId === 'medi_jinx' && !colorCounts.has(0x11) && !colorCounts.has(0x12) && !colorCounts.has(0x21) && !colorCounts.has(0x22)) {
+      colorCounts.set(0x11, 500);
+    }
+    if (colorCounts.has(0x08) && (charId === 'medi_jinx' || charId === 'dj_tito')) {
+      colorCounts.delete(0x08);
+    }
+    if (colorCounts.has(0x18) && (charId === 'medi_jinx' || charId === 'dj_tito')) {
+      colorCounts.delete(0x18);
+    }
 
-  const sorted = [...colorCounts.entries()].sort((a, b) => b[1] - a[1]);
-  const top12 = sorted.slice(0, 12).map(([idx]) => idx);
+    const sorted = [...colorCounts.entries()].sort((a, b) => b[1] - a[1]);
+    top12 = sorted.slice(0, 12).map(([idx]) => idx);
 
-  const paletteMap = { '.': -1 };
-  top12.forEach((nesIdx, i) => {
-    paletteMap[PALETTE_TOKENS[i]] = nesIdx;
-  });
+    paletteMap = { '.': -1 };
+    top12.forEach((nesIdx, i) => {
+      paletteMap[PALETTE_TOKENS[i]] = nesIdx;
+    });
+  }
 
   const rows = [];
   for (let y = 0; y < targetH; y++) {
@@ -209,37 +338,134 @@ async function processSpriteImage(img, box, targetW, targetH, charId) {
 async function buildAllSprites() {
   const spriteMapConfig = {};
 
-  for (const charConfig of CHARACTERS) {
-    console.log(`Processing ${charConfig.id}...`);
-    let img = await Jimp.read(charConfig.file);
-    if (charConfig.crop) {
-      img = img.crop(charConfig.crop);
+  for (const opp of OPPONENTS) {
+    console.log(`Processing ${opp.id}...`);
+    const img = await Jimp.read(opp.file);
+    const boxes = FIGURE_BOXES[opp.id];
+    const idleBox = boxes[0];
+    const idleH = idleBox[3] - idleBox[1] + 1;
+    const factor = 140 / idleH;
+
+    const usedIndices = new Set();
+    let usesLie = false;
+    for (const [action, fig] of Object.entries(ACTION_MAP[opp.id])) {
+      if (fig === 'LIE') {
+        usesLie = true;
+      } else {
+        usedIndices.add(fig);
+      }
     }
 
-    // Process clean Idle base frame
-    const idleSprite = await processSpriteImage(img, charConfig.figBox, charConfig.targetW, charConfig.targetH, charConfig.id);
+    // Process idle figure 0 first to establish the character's base palette
+    const idleSrcW = idleBox[2] - idleBox[0] + 1;
+    const idleSrcH = idleBox[3] - idleBox[1] + 1;
+    const idleTargetW = Math.round(idleSrcW * factor);
+    const idleTargetH = Math.round(idleSrcH * factor);
+    const idleBoxCrop = { x: idleBox[0], y: idleBox[1], w: idleSrcW, h: idleSrcH };
 
-    spriteMapConfig[charConfig.id] = {
-      sheet: charConfig.file,
-      idleFigureIndex: 0,
+    const idleSprite = await processSpriteImage(img, idleBoxCrop, idleTargetW, idleTargetH, opp.id, false, null);
+    const charPalette = idleSprite.palette;
+
+    const sprites = {
+      'FIG_0': idleSprite,
     };
 
-    const content = `import { SpriteData } from '../types';
+    for (const figIdx of usedIndices) {
+      if (figIdx === 0) continue;
+      const b = boxes[figIdx];
+      const srcW = b[2] - b[0] + 1;
+      const srcH = b[3] - b[1] + 1;
+      const targetW = Math.round(srcW * factor);
+      const targetH = Math.round(srcH * factor);
+      const box = { x: b[0], y: b[1], w: srcW, h: srcH };
 
-export const IDLE_BASE_${charConfig.id.toUpperCase()}: SpriteData = {
-  width: ${idleSprite.width},
-  height: ${idleSprite.height},
-  palette: ${JSON.stringify(idleSprite.palette, null, 2)},
-  rows: [
-${idleSprite.rows.map(r => `    ${JSON.stringify(r)},`).join('\n')}
-  ],
-};
-`;
+      const sprite = await processSpriteImage(img, box, targetW, targetH, opp.id, false, charPalette);
+      sprites[`FIG_${figIdx}`] = sprite;
+    }
 
-    const outPath = path.join(OUT_DIR, `${charConfig.id}.ts`);
+    if (usesLie) {
+      // AINT MAN LIE: rotate idle frame 0 by 90 deg counter-clockwise
+      const b = boxes[0];
+      const srcW = b[2] - b[0] + 1;
+      const srcH = b[3] - b[1] + 1;
+      const targetW = Math.round(srcW * factor);
+      const targetH = Math.round(srcH * factor);
+      const box = { x: b[0], y: b[1], w: srcW, h: srcH };
+
+      const sprite = await processSpriteImage(img, box, targetW, targetH, opp.id, true, charPalette);
+      sprites['LIE'] = sprite;
+    }
+
+    spriteMapConfig[opp.id] = {
+      sheet: opp.file,
+      idleFigureIndex: 0,
+      scaleFactor: factor,
+      figureBoxes: boxes,
+      actionMap: ACTION_MAP[opp.id],
+    };
+
+    const upId = opp.id.toUpperCase();
+    let content = `import { SpriteData } from '../types';\n\n`;
+    content += `export const IDLE_BASE_${upId}: SpriteData = {\n`;
+    content += `  width: ${sprites['FIG_0'].width},\n`;
+    content += `  height: ${sprites['FIG_0'].height},\n`;
+    content += `  palette: ${JSON.stringify(sprites['FIG_0'].palette, null, 2)},\n`;
+    content += `  rows: [\n${sprites['FIG_0'].rows.map(r => `    ${JSON.stringify(r)},`).join('\n')}\n  ],\n};\n\n`;
+
+    // Export each generated frame
+    for (const [key, sprite] of Object.entries(sprites)) {
+      if (key === 'FIG_0') continue;
+      content += `export const ${upId}_${key}: SpriteData = {\n`;
+      content += `  width: ${sprite.width},\n`;
+      content += `  height: ${sprite.height},\n`;
+      content += `  palette: ${JSON.stringify(sprite.palette, null, 2)},\n`;
+      content += `  rows: [\n${sprite.rows.map(r => `    ${JSON.stringify(r)},`).join('\n')}\n  ],\n};\n\n`;
+    }
+
+    // Export map dictionary: maps figure index / 'LIE' to SpriteData
+    content += `export const ${upId}_FRAMES: Record<number | string, SpriteData> = {\n`;
+    content += `  0: IDLE_BASE_${upId},\n`;
+    for (const key of Object.keys(sprites)) {
+      if (key === 'FIG_0') continue;
+      if (key === 'LIE') {
+        content += `  LIE: ${upId}_LIE,\n`;
+      } else {
+        const num = key.replace('FIG_', '');
+        content += `  ${num}: ${upId}_${key},\n`;
+      }
+    }
+    content += `};\n`;
+
+    const outPath = path.join(OUT_DIR, `${opp.id}.ts`);
     fs.writeFileSync(outPath, content, 'utf8');
     console.log(`Wrote ${outPath}`);
   }
+
+  // Player sprite
+  console.log('Processing player...');
+  let playerImg = await Jimp.read('public/assets/player_sprites_raw.jpg');
+  playerImg = playerImg.crop({ x: 512, y: 512, w: 512, h: 512 });
+  const playerSprite = await processSpriteImage(playerImg, { x: 0, y: 16, w: 66, h: 111 }, 50, 75, 'player', false);
+
+  const playerContent = `import { SpriteData } from '../types';
+
+export const IDLE_BASE_PLAYER: SpriteData = {
+  width: ${playerSprite.width},
+  height: ${playerSprite.height},
+  palette: ${JSON.stringify(playerSprite.palette, null, 2)},
+  rows: [
+${playerSprite.rows.map(r => `    ${JSON.stringify(r)},`).join('\n')}
+  ],
+};
+`;
+  const playerOutPath = path.join(OUT_DIR, 'player.ts');
+  fs.writeFileSync(playerOutPath, playerContent, 'utf8');
+  console.log(`Wrote ${playerOutPath}`);
+
+  spriteMapConfig['player'] = {
+    sheet: 'public/assets/player_sprites_raw.jpg',
+    idleFigureIndex: 0,
+  };
 
   const mapPath = 'scripts/sprite-map.json';
   fs.writeFileSync(mapPath, JSON.stringify(spriteMapConfig, null, 2), 'utf8');

@@ -1,23 +1,472 @@
 {
   "aint_man": {
     "sheet": "public/assets/aint_man.jpg",
-    "idleFigureIndex": 0
+    "idleFigureIndex": 0,
+    "scaleFactor": 1.443298969072165,
+    "figureBoxes": [
+      [
+        12,
+        7,
+        85,
+        103
+      ],
+      [
+        93,
+        7,
+        166,
+        103
+      ],
+      [
+        175,
+        7,
+        235,
+        104
+      ],
+      [
+        250,
+        7,
+        323,
+        103
+      ],
+      [
+        9,
+        129,
+        89,
+        225
+      ],
+      [
+        95,
+        129,
+        174,
+        226
+      ],
+      [
+        178,
+        129,
+        257,
+        226
+      ],
+      [
+        260,
+        129,
+        327,
+        226
+      ],
+      [
+        9,
+        257,
+        75,
+        352
+      ],
+      [
+        88,
+        257,
+        154,
+        352
+      ],
+      [
+        166,
+        257,
+        233,
+        352
+      ],
+      [
+        248,
+        255,
+        310,
+        352
+      ],
+      [
+        8,
+        376,
+        80,
+        462
+      ],
+      [
+        85,
+        379,
+        166,
+        462
+      ]
+    ],
+    "actionMap": {
+      "IDLE": 0,
+      "TELL_JAB": 3,
+      "PUNCH_JAB": 4,
+      "TELL_HOOK": 7,
+      "PUNCH_HOOK": 6,
+      "TELL_UPPERCUT": 12,
+      "PUNCH_UPPERCUT": 11,
+      "BLOCK_HIGH": 3,
+      "BLOCK_LOW": 10,
+      "HIT": 2,
+      "STUNNED": 10,
+      "KNOCKED_DOWN": "LIE",
+      "KO": "LIE",
+      "TAUNT": 13
+    }
   },
   "medi_jinx": {
     "sheet": "public/assets/medi_jinx.jpg",
-    "idleFigureIndex": 0
+    "idleFigureIndex": 0,
+    "scaleFactor": 1.3461538461538463,
+    "figureBoxes": [
+      [
+        9,
+        10,
+        61,
+        113
+      ],
+      [
+        95,
+        10,
+        180,
+        114
+      ],
+      [
+        194,
+        10,
+        279,
+        113
+      ],
+      [
+        8,
+        129,
+        80,
+        235
+      ],
+      [
+        104,
+        128,
+        177,
+        234
+      ],
+      [
+        200,
+        128,
+        271,
+        234
+      ],
+      [
+        11,
+        252,
+        76,
+        357
+      ],
+      [
+        98,
+        254,
+        179,
+        357
+      ],
+      [
+        196,
+        252,
+        274,
+        352
+      ],
+      [
+        190,
+        362,
+        259,
+        462
+      ],
+      [
+        41,
+        398,
+        152,
+        462
+      ]
+    ],
+    "actionMap": {
+      "IDLE": 0,
+      "TELL_JAB": 6,
+      "PUNCH_JAB": 2,
+      "TELL_HOOK": 3,
+      "PUNCH_HOOK": 1,
+      "TELL_UPPERCUT": 5,
+      "PUNCH_UPPERCUT": 9,
+      "BLOCK_HIGH": 6,
+      "BLOCK_LOW": 6,
+      "HIT": 8,
+      "STUNNED": 8,
+      "KNOCKED_DOWN": 10,
+      "KO": 10,
+      "TAUNT": 4
+    }
   },
   "dj_tito": {
     "sheet": "public/assets/dj_tito.jpg",
-    "idleFigureIndex": 0
+    "idleFigureIndex": 0,
+    "scaleFactor": 1.25,
+    "figureBoxes": [
+      [
+        5,
+        10,
+        56,
+        121
+      ],
+      [
+        98,
+        19,
+        186,
+        121
+      ],
+      [
+        210,
+        19,
+        298,
+        121
+      ],
+      [
+        7,
+        143,
+        92,
+        246
+      ],
+      [
+        98,
+        142,
+        170,
+        247
+      ],
+      [
+        180,
+        140,
+        255,
+        247
+      ],
+      [
+        264,
+        140,
+        316,
+        247
+      ],
+      [
+        7,
+        260,
+        90,
+        363
+      ],
+      [
+        100,
+        262,
+        169,
+        359
+      ],
+      [
+        201,
+        266,
+        281,
+        353
+      ],
+      [
+        177,
+        360,
+        301,
+        460
+      ],
+      [
+        50,
+        385,
+        148,
+        460
+      ]
+    ],
+    "actionMap": {
+      "IDLE": 0,
+      "TELL_JAB": 5,
+      "PUNCH_JAB": 1,
+      "TELL_HOOK": 6,
+      "PUNCH_HOOK": 7,
+      "TELL_UPPERCUT": 8,
+      "PUNCH_UPPERCUT": 4,
+      "BLOCK_HIGH": 5,
+      "BLOCK_LOW": 8,
+      "HIT": 9,
+      "STUNNED": 9,
+      "KNOCKED_DOWN": 11,
+      "KO": 11,
+      "TAUNT": 10
+    }
   },
   "mr_yankee": {
     "sheet": "public/assets/mr_yankee.jpg",
-    "idleFigureIndex": 0
+    "idleFigureIndex": 0,
+    "scaleFactor": 1.238938053097345,
+    "figureBoxes": [
+      [
+        22,
+        7,
+        76,
+        119
+      ],
+      [
+        110,
+        7,
+        203,
+        119
+      ],
+      [
+        220,
+        7,
+        313,
+        119
+      ],
+      [
+        10,
+        132,
+        103,
+        245
+      ],
+      [
+        10,
+        247,
+        103,
+        356
+      ],
+      [
+        109,
+        132,
+        191,
+        244
+      ],
+      [
+        215,
+        132,
+        306,
+        244
+      ],
+      [
+        106,
+        250,
+        197,
+        356
+      ],
+      [
+        216,
+        250,
+        322,
+        353
+      ],
+      [
+        209,
+        358,
+        291,
+        462
+      ],
+      [
+        42,
+        388,
+        168,
+        462
+      ]
+    ],
+    "actionMap": {
+      "IDLE": 0,
+      "TELL_JAB": 3,
+      "PUNCH_JAB": 1,
+      "TELL_HOOK": 7,
+      "PUNCH_HOOK": 8,
+      "TELL_UPPERCUT": 4,
+      "PUNCH_UPPERCUT": 9,
+      "BLOCK_HIGH": 5,
+      "BLOCK_LOW": 7,
+      "HIT": 3,
+      "STUNNED": 3,
+      "KNOCKED_DOWN": 10,
+      "KO": 10,
+      "TAUNT": 9
+    }
   },
   "maga_man": {
     "sheet": "public/assets/maga_man.jpg",
-    "idleFigureIndex": 0
+    "idleFigureIndex": 0,
+    "scaleFactor": 1.2612612612612613,
+    "figureBoxes": [
+      [
+        10,
+        8,
+        64,
+        118
+      ],
+      [
+        102,
+        8,
+        193,
+        119
+      ],
+      [
+        205,
+        8,
+        282,
+        119
+      ],
+      [
+        8,
+        136,
+        79,
+        243
+      ],
+      [
+        104,
+        138,
+        178,
+        243
+      ],
+      [
+        200,
+        139,
+        287,
+        243
+      ],
+      [
+        11,
+        250,
+        97,
+        353
+      ],
+      [
+        105,
+        250,
+        180,
+        353
+      ],
+      [
+        198,
+        253,
+        287,
+        353
+      ],
+      [
+        172,
+        359,
+        263,
+        461
+      ],
+      [
+        26,
+        394,
+        148,
+        461
+      ]
+    ],
+    "actionMap": {
+      "IDLE": 0,
+      "TELL_JAB": 2,
+      "PUNCH_JAB": 1,
+      "TELL_HOOK": 7,
+      "PUNCH_HOOK": 6,
+      "TELL_UPPERCUT": 4,
+      "PUNCH_UPPERCUT": 3,
+      "BLOCK_HIGH": 2,
+      "BLOCK_LOW": 7,
+      "HIT": 2,
+      "STUNNED": 0,
+      "KNOCKED_DOWN": 10,
+      "KO": 10,
+      "TAUNT": 9
+    }
   },
   "player": {
     "sheet": "public/assets/player_sprites_raw.jpg",

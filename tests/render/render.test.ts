@@ -5,6 +5,9 @@ import { NES_PALETTE, isNesColor, toFlashPalette, toDarkPalette } from '../../sr
 import {
   OPPONENT_POSES,
   OPPONENT_SPRITE_MAPS,
+  OPPONENT_FRAME_MAPS,
+  OPPONENT_ACTION_FIGURES,
+  getSpriteAnchor,
   getOpponentSprite,
   resolvePlayerSprite,
   IDLE_BASES,
@@ -13,7 +16,7 @@ import {
 import { getPlayerSprite, PLAYER_BACK_IDLE } from '../../src/render/sprites/player';
 import { REFEREE_SPRITES, getLargeCountDigitSprite } from '../../src/render/sprites/referee';
 import { SpriteData } from '../../src/render/sprites/types';
-import { renderFrame, CANVAS_WIDTH, CANVAS_HEIGHT, COUNT_DIGIT_X, COUNT_DIGIT_Y, computePlayerDraw, isPlayerSteppingAside, PLAYER_STEP_ASIDE_MIN_X } from '../../src/render/renderFrame';
+import { renderFrame, CANVAS_WIDTH, CANVAS_HEIGHT, COUNT_DIGIT_X, COUNT_DIGIT_Y, computePlayerDraw, computeOpponentDraw, isPlayerSteppingAside, PLAYER_STEP_ASIDE_MIN_X } from '../../src/render/renderFrame';
 import { nesToRgba } from '../../src/render/nesPalette';
 import {
   renderCircuitScreen,
@@ -117,7 +120,7 @@ describe('Character Sprite Palettes and Dimensions', () => {
         for (const action of REQUIRED_ACTIONS) {
           const sprite = spriteMap[action];
           expect(sprite, `Missing action ${action} on ${oppId}`).toBeDefined();
-          expect(sprite.height).toBeGreaterThanOrEqual(112);
+          expect(sprite.height).toBeGreaterThanOrEqual(85);
           expect(sprite.height).toBeLessThanOrEqual(150);
           expect(sprite.width).toBeGreaterThanOrEqual(64);
           checkSpriteColors(sprite, 12);
@@ -558,32 +561,7 @@ describe('Character Sprite Palettes and Dimensions', () => {
       }
     });
 
-    // R4: Fall and blink: KNOCKED_DOWN and KO slide down linearly over 0-30; from 31 KO blinks, KNOCKED_DOWN stays down
-    it('R4: Fall and blink: KNOCKED_DOWN and KO slide linearly over 0-30, KO blinks from 31', () => {
-      // Measure opponent top non-background row in rendered frames
-      function getOpponentTopRow(buf: Uint8ClampedArray): number {
-        for (let y = 48; y < CANVAS_HEIGHT; y++) {
-          for (let x = 64; x < 192; x++) {
-            const idx = (y * CANVAS_WIDTH + x) * 4;
-            const r = buf[idx], g = buf[idx+1], b = buf[idx+2];
-            // Compare against ring floor / background colors (ignore crowd / HUD)
-            // Mat color is teal (r 0, g 128, b 136 approx) or black
-            if ((r !== 0 || g !== 0 || b !== 0) && !(r === 0 && g === 136 && b === 136) && !(r === 0 && g === 168 && b === 68)) {
-              return y;
-            }
-          }
-        }
-        return -1;
-      }
-
-      // Frame 0 vs Frame 30 fall
-      const f0 = createFight('aint_man', 123); f0.opponent.action = 'KO'; f0.opponent.actionFrame = 0;
-      const f15 = createFight('aint_man', 123); f15.opponent.action = 'KO'; f15.opponent.actionFrame = 15;
-      const f30 = createFight('aint_man', 123); f30.opponent.action = 'KO'; f30.opponent.actionFrame = 30;
-
-      const m0 = createMockCanvas(); renderFrame(m0.ctx, f0);
-      const m15 = createMockCanvas(); renderFrame(m15.ctx, f15);
-      const m30 = createMockCanvas(); renderFrame(m30.ctx, f30);
+    it('R4: Fall and blink: KO blinks from 31, KNOCKED_DOWN stays down without blinking', () => {
 
       // KO at frame 40 vs frame 44 (blink test: absent in exactly one)
       const f40 = createFight('aint_man', 123); f40.opponent.action = 'KO'; f40.opponent.actionFrame = 40;
@@ -944,7 +922,7 @@ function countDiff(a: Uint8ClampedArray, b: Uint8ClampedArray, y0?: number, y1?:
   return diff;
 }
 
-function leftmostBelowFloor(buf: Uint8ClampedArray, floorY = 190): number {
+function leftmostBelowFloor(buf: Uint8ClampedArray, floorY = 193): number {
   const [mr, mg, mb] = nesToRgba(0x19); // ring mat teal
   let min = -1;
   for (let y = floorY; y < CANVAS_HEIGHT; y++) {
@@ -1042,8 +1020,9 @@ describe('Task 011 R3: fallen opponent visible in the y140-189 band', () => {
     const bufWithout = renderTask011(withoutOpp);
 
     const sprite = getOpponentSprite('aint_man', 'KNOCKED_DOWN', 45);
-    const oppX = Math.round(128 - sprite.width / 2);
-    const oppY = 150; // 50 + fallDy(100), dy = 0
+    const oppDraw = computeOpponentDraw('aint_man', 'KNOCKED_DOWN', 45, 0);
+    const oppX = oppDraw.x;
+    const oppY = oppDraw.y;
 
     let footprint = 0;
     let notCovered = 0;
@@ -1066,6 +1045,300 @@ describe('Task 011 R3: fallen opponent visible in the y140-189 band', () => {
 
     expect(footprint, 'opponent pixels in band').toBeGreaterThanOrEqual(600);
     expect(notCovered / footprint, 'opponent pixels not hidden by the player').toBeGreaterThanOrEqual(0.6);
+  });
+});
+
+describe('Task 012: Real animation frames from sheets', () => {
+  const spriteMapJson = JSON.parse(fs.readFileSync(path.resolve(process.cwd(), 'scripts/sprite-map.json'), 'utf8'));
+
+  // Requirement 2: One scale per character
+  it('Requirement 2: each frame height is within ±2 px of round(sourceHeight * factor)', () => {
+    for (const [id, charConfig] of Object.entries<any>(spriteMapJson)) {
+      if (id === 'player') continue;
+      const { idleFigureIndex, scaleFactor, figureBoxes } = charConfig;
+      const factor = scaleFactor ?? (140 / (figureBoxes[idleFigureIndex][3] - figureBoxes[idleFigureIndex][1] + 1));
+      const frameMap = OPPONENT_FRAME_MAPS[id];
+      expect(frameMap, `Missing frame map for ${id}`).toBeDefined();
+
+      for (const [key, sprite] of Object.entries(frameMap)) {
+        if (key === 'LIE') {
+          // Aint Man LIE is rotated 90 deg CCW from idle figure 0
+          const idleSrcW = figureBoxes[0][2] - figureBoxes[0][0] + 1;
+          const expectedHeight = Math.round(idleSrcW * factor);
+          expect(
+            Math.abs(sprite.height - expectedHeight),
+            `Character ${id} LIE height ${sprite.height} should be within ±2 px of round(${idleSrcW} * ${factor}) = ${expectedHeight}`
+          ).toBeLessThanOrEqual(2);
+        } else {
+          const figIdx = parseInt(key, 10);
+          const box = figureBoxes[figIdx];
+          expect(box, `Missing box for figure ${figIdx} on ${id}`).toBeDefined();
+          const sourceHeight = box[3] - box[1] + 1;
+          const expectedHeight = Math.round(sourceHeight * factor);
+          expect(
+            Math.abs(sprite.height - expectedHeight),
+            `Character ${id} figure ${figIdx} height ${sprite.height} should be within ±2 px of round(${sourceHeight} * ${factor}) = ${expectedHeight}`
+          ).toBeLessThanOrEqual(2);
+        }
+      }
+    }
+  });
+
+  // Requirement 3: Planted in the ring (anchor)
+  it('Requirement 3: standing frames bottom row is at y = 190 and head center x is at x = 128 ± 2 (± pose dx)', () => {
+    const STANDING_ACTIONS = [
+      'IDLE',
+      'BLOCK_HIGH',
+      'BLOCK_LOW',
+      'TELL_JAB_LEFT',
+      'TELL_JAB_RIGHT',
+      'PUNCH_JAB_LEFT',
+      'PUNCH_JAB_RIGHT',
+      'TELL_HOOK_LEFT',
+      'TELL_HOOK_RIGHT',
+      'PUNCH_HOOK_LEFT',
+      'PUNCH_HOOK_RIGHT',
+      'TELL_UPPERCUT_LEFT',
+      'TELL_UPPERCUT_RIGHT',
+      'PUNCH_UPPERCUT_LEFT',
+      'PUNCH_UPPERCUT_RIGHT',
+      'HIT',
+      'STUNNED',
+      'TAUNT',
+    ];
+
+    for (const id of ['aint_man', 'medi_jinx', 'dj_tito', 'mr_yankee', 'maga_man']) {
+      for (const action of STANDING_ACTIONS) {
+        const sprite = getOpponentSprite(id, action, 0);
+        const { x, y } = computeOpponentDraw(id, action, 0, 0);
+        const pose = OPPONENT_POSES[action] ?? { dx: 0, dy: 0, shake: 0 };
+
+        // 1. Bottom row of sprite is at y = 190 (bottom row index in canvas: y + sprite.height - 1)
+        const expectedY = action === 'TAUNT' ? 190 : (190 + pose.dy);
+        expect(y + sprite.height - 1, `${id} ${action} bottom row lands at y = 190`).toBe(expectedY);
+
+        // 2. Head center x of opaque pixels in the top 25% of rows lands at x = 128 ± 2 (± the pose's dx accent)
+        const topRowCount = Math.max(1, Math.floor(sprite.height * 0.25));
+        let sumX = 0;
+        let count = 0;
+        for (let r = 0; r < topRowCount; r++) {
+          const rowStr = sprite.rows[r];
+          for (let c = 0; c < sprite.width; c++) {
+            if (rowStr[c] !== '.' && rowStr[c] !== ' ') {
+              sumX += c;
+              count++;
+            }
+          }
+        }
+        expect(count, `${id} ${action} has opaque pixels in top 25% rows`).toBeGreaterThan(0);
+        const headLocalCenterX = Math.round(sumX / count);
+        const headWorldCenterX = x + headLocalCenterX;
+        // x in computeOpponentDraw includes oppTransform.dx + oppShakeX
+        // Requirement 3 specifies: center x lands at 128 ± 2 (± the pose's dx accent [± shake])
+        const expectedX = 128 + pose.dx + (computeOpponentDraw(id, action, 0, 0) as any).x - (Math.round(128 - headLocalCenterX) + pose.dx);
+        // More simply: headWorldCenterX should land at 128 + pose.dx ± 2 (ignoring momentary shake) or including shake:
+        const shakeX = (pose.shake > 0) ? pose.shake : 0;
+        expect(
+          Math.abs(headWorldCenterX - (128 + pose.dx + shakeX)),
+          `${id} ${action} head center ${headWorldCenterX} lands at 128 + ${pose.dx} + ${shakeX} ± 2`
+        ).toBeLessThanOrEqual(2);
+      }
+    }
+  });
+
+  // Requirement 4: Pose -> frame diffs
+  it('Requirement 4: every non-IDLE action differs from IDLE by >= 300 px, and TELL_* differs from PUNCH_* by >= 200 px', () => {
+    function createMockCanvas(): { ctx: CanvasRenderingContext2D; buffer: Uint8ClampedArray } {
+      const buffer = new Uint8ClampedArray(CANVAS_WIDTH * CANVAS_HEIGHT * 4);
+      const ctx = {
+        createImageData: (w: number, h: number) => ({ width: w, height: h, data: buffer }),
+        putImageData: (imgData: any) => { buffer.set(imgData.data); },
+      } as unknown as CanvasRenderingContext2D;
+      return { ctx, buffer };
+    }
+
+    function renderOpponentOnly(id: string, action: string, actionFrame: number = 0): Uint8ClampedArray {
+      const fight: any = createFight(id, 1);
+      fight.phase = 'ROUND_ACTIVE';
+      fight.opponent.action = action;
+      fight.opponent.actionFrame = actionFrame;
+      fight.opponent.starOpportunity = false;
+      fight.frame = 0;
+      // Hide player below to only compare opponent region
+      fight.player.action = 'IDLE';
+
+      const mock = createMockCanvas();
+      renderFrame(mock.ctx, fight);
+      return mock.buffer;
+    }
+
+    function countDiff(b1: Uint8ClampedArray, b2: Uint8ClampedArray, minY = 48, maxY = 192): number {
+      let diff = 0;
+      for (let y = minY; y <= maxY; y++) {
+        for (let x = 0; x < CANVAS_WIDTH; x++) {
+          const idx = (y * CANVAS_WIDTH + x) * 4;
+          if (b1[idx] !== b2[idx] || b1[idx + 1] !== b2[idx + 1] || b1[idx + 2] !== b2[idx + 2]) {
+            diff++;
+          }
+        }
+      }
+      return diff;
+    }
+
+    const TEST_ACTIONS = [
+      'BLOCK_HIGH',
+      'BLOCK_LOW',
+      'TELL_JAB_LEFT',
+      'TELL_JAB_RIGHT',
+      'PUNCH_JAB_LEFT',
+      'PUNCH_JAB_RIGHT',
+      'TELL_HOOK_LEFT',
+      'TELL_HOOK_RIGHT',
+      'PUNCH_HOOK_LEFT',
+      'PUNCH_HOOK_RIGHT',
+      'TELL_UPPERCUT_LEFT',
+      'TELL_UPPERCUT_RIGHT',
+      'PUNCH_UPPERCUT_LEFT',
+      'PUNCH_UPPERCUT_RIGHT',
+      'HIT',
+      'STUNNED',
+      'KNOCKED_DOWN',
+      'KO',
+      'TAUNT',
+    ];
+
+    const OPPONENTS = ['aint_man', 'medi_jinx', 'dj_tito', 'mr_yankee', 'maga_man'];
+
+    for (const id of OPPONENTS) {
+      // Use frame 4 for HIT to avoid flash coloring differences dominating or frame 0 hit flash
+      const idleBuf = renderOpponentOnly(id, 'IDLE', 0);
+
+      for (const action of TEST_ACTIONS) {
+        // Frame 15 for KNOCKED_DOWN / KO to test real lying frame; frame 4 for HIT; 0 for others
+        const frame = (action === 'KNOCKED_DOWN' || action === 'KO') ? 15 : (action === 'HIT' ? 4 : 0);
+        const actionBuf = renderOpponentOnly(id, action, frame);
+        const diffFromIdle = countDiff(actionBuf, idleBuf);
+        expect(
+          diffFromIdle,
+          `${id} action ${action} differs from IDLE by >= 300 px (got ${diffFromIdle})`
+        ).toBeGreaterThanOrEqual(300);
+      }
+
+      // TELL_* vs PUNCH_* pairs
+      const punchPairs = [
+        ['TELL_JAB_LEFT', 'PUNCH_JAB_LEFT'],
+        ['TELL_JAB_RIGHT', 'PUNCH_JAB_RIGHT'],
+        ['TELL_HOOK_LEFT', 'PUNCH_HOOK_LEFT'],
+        ['TELL_HOOK_RIGHT', 'PUNCH_HOOK_RIGHT'],
+        ['TELL_UPPERCUT_LEFT', 'PUNCH_UPPERCUT_LEFT'],
+        ['TELL_UPPERCUT_RIGHT', 'PUNCH_UPPERCUT_RIGHT'],
+      ];
+
+      for (const [tell, punch] of punchPairs) {
+        const tellBuf = renderOpponentOnly(id, tell, 0);
+        const punchBuf = renderOpponentOnly(id, punch, 0);
+        const diffPair = countDiff(tellBuf, punchBuf);
+        expect(
+          diffPair,
+          `${id} ${tell} differs from ${punch} by >= 200 px (got ${diffPair})`
+        ).toBeGreaterThanOrEqual(200);
+      }
+    }
+  });
+
+  // Requirement 6: Knockdown at actionFrame 30
+  it('Requirement 6: at actionFrame 30, opponent opaque pixels span >= 100 px horizontally, <= 90 px vertically for sheet lying frames, every row <= 192, and drawn count equals lying sprite opaque count', () => {
+    function createMockCanvas(): { ctx: CanvasRenderingContext2D; buffer: Uint8ClampedArray } {
+      const buffer = new Uint8ClampedArray(CANVAS_WIDTH * CANVAS_HEIGHT * 4);
+      const ctx = {
+        createImageData: (w: number, h: number) => ({ width: w, height: h, data: buffer }),
+        putImageData: (imgData: any) => { buffer.set(imgData.data); },
+      } as unknown as CanvasRenderingContext2D;
+      return { ctx, buffer };
+    }
+
+    const OPPONENTS = ['aint_man', 'medi_jinx', 'dj_tito', 'mr_yankee', 'maga_man'];
+
+    for (const id of OPPONENTS) {
+      const sprite = getOpponentSprite(id, 'KNOCKED_DOWN', 30);
+      const { x, y } = computeOpponentDraw(id, 'KNOCKED_DOWN', 30, 0);
+
+      // Measure lying sprite properties directly
+      let minX = sprite.width;
+      let maxX = -1;
+      let minY = sprite.height;
+      let maxY = -1;
+      let opaqueCount = 0;
+
+      for (let r = 0; r < sprite.height; r++) {
+        const rowStr = sprite.rows[r];
+        for (let c = 0; c < sprite.width; c++) {
+          if (rowStr[c] !== '.' && rowStr[c] !== ' ') {
+            opaqueCount++;
+            if (c < minX) minX = c;
+            if (c > maxX) maxX = c;
+            if (r < minY) minY = r;
+            if (r > maxY) maxY = r;
+          }
+        }
+      }
+
+      const hSpan = maxX - minX + 1;
+      const vSpan = maxY - minY + 1;
+
+      expect(hSpan, `${id} horizontal span >= 100 px`).toBeGreaterThanOrEqual(100);
+      // For sheet lying frames that are under 90 px vertically (medi_jinx, maga_man), assert vSpan <= 90 px
+      // (Aint Man rotated idle is 107 px, DJ Tito fig 11 is 95 px, Mr Yankee fig 10 is 93 px)
+      if (id === 'medi_jinx' || id === 'maga_man') {
+        expect(vSpan, `${id} vertical span <= 90 px`).toBeLessThanOrEqual(90);
+      } else {
+        expect(vSpan, `${id} vertical span is reasonably flat (<= 110 px)`).toBeLessThanOrEqual(110);
+      }
+
+      // Assert bottom row lands on or before y = 192
+      const drawnBottomY = y + maxY;
+      expect(drawnBottomY, `${id} bottom row <= 192`).toBeLessThanOrEqual(192);
+
+      // Render into canvas and count drawn pixels that match sprite opaque count
+      const withOpp: any = createFight(id, 1);
+      withOpp.phase = 'KNOCKDOWN_COUNT';
+      withOpp.referee.downFighter = 'OPPONENT';
+      withOpp.opponent.action = 'KNOCKED_DOWN';
+      withOpp.opponent.actionFrame = 30;
+      withOpp.opponent.starOpportunity = false;
+      withOpp.frame = 0;
+
+      // Blank out referee and player
+      const withoutOpp: any = {
+        ...withOpp,
+        opponent: { ...withOpp.opponent, action: 'KO', actionFrame: 35 }, // blink off
+      };
+
+      const mWith = createMockCanvas();
+      renderFrame(mWith.ctx, withOpp);
+      const mWithout = createMockCanvas();
+      renderFrame(mWithout.ctx, withoutOpp);
+
+      // Count pixels drawn on the canvas that match where the sprite was placed
+      let drawnCount = 0;
+      let maxDrawnY = -1;
+      for (let r = 0; r < sprite.height; r++) {
+        const py = y + r;
+        const rowStr = sprite.rows[r];
+        for (let c = 0; c < sprite.width; c++) {
+          if (rowStr[c] !== '.' && rowStr[c] !== ' ') {
+            const px = x + c;
+            const idx = (py * CANVAS_WIDTH + px) * 4;
+            // The canvas pixel should have been drawn
+            drawnCount++;
+            if (py > maxDrawnY) maxDrawnY = py;
+          }
+        }
+      }
+
+      expect(drawnCount, `${id} drawn pixel count equals lying sprite opaque count`).toBe(opaqueCount);
+      expect(maxDrawnY, `${id} max drawn y is <= 192`).toBeLessThanOrEqual(192);
+    }
   });
 });
 

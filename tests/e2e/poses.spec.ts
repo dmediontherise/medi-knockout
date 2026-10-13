@@ -249,8 +249,8 @@ test.describe('Pose Preview and Contact Sheets Suite', () => {
     });
   }
 
-  // 4. Requirement 8: Knockdown screenshots screenshots/fall/<id>-KO-<n>.png for n in {0, 15, 30, 40, 44}
-  const FALL_FRAMES = [0, 15, 30, 40, 44];
+  // 4. Requirements 6 & 7: Knockdown screenshots screenshots/fall/<id>-KO-<n>.png for n in {0, 5, 12, 20, 30}
+  const FALL_FRAMES = [0, 5, 12, 20, 30];
   const fallDir = path.join(screenshotsDir, 'fall');
 
   for (const oppId of OPPONENT_IDS) {
@@ -284,79 +284,47 @@ test.describe('Pose Preview and Contact Sheets Suite', () => {
         frameImages[n] = frameImg;
       }
 
-      // Assert topmost non-background row moves down by >= 30 px between frames 0 and 30
-      // Requirement 8: Measure sprite pixels inside the ring area by comparing with a frame rendered without the opponent
-      // Frame 44 is blink-hidden (no opponent sprite)
-      const emptyFrame = frameImages[44];
+      // Empty reference frame: actionFrame 35 blinks off for KO
+      const emptyPath = path.join(fallDir, `.${oppId}-empty-ref.png`);
+      await page.goto(`./?pose=${oppId}&action=KO&player=IDLE&frame=35`);
+      const canvas = page.locator('canvas.game-canvas');
+      await expect(canvas).toBeVisible();
+      await page.waitForTimeout(50);
+      await canvas.screenshot({ path: emptyPath });
+      const emptyFrame = await Jimp.read(emptyPath);
+      if (emptyFrame.bitmap.width !== 256 || emptyFrame.bitmap.height !== 240) {
+        emptyFrame.resize({ w: 256, h: 240 });
+      }
+      fs.rmSync(emptyPath, { force: true });
 
-      function findTopOpponentRow(img: any): number {
-        // Scan ring area inside y: 48..200, x: 40..216
-        for (let y = 48; y < 200; y++) {
-          for (let x = 40; x < 216; x++) {
-            const p = img.getPixelColor(x, y);
-            const pEmpty = emptyFrame.getPixelColor(x, y);
-            if (p !== pEmpty) {
-              return y;
-            }
+      // Requirement 6 assertions at frame 30:
+      // - Opponent opaque pixels span >= 100 px horizontally
+      // - At most 90 px vertically for characters with sheet lying frames (medi_jinx, maga_man)
+      // - Every opaque row is <= 192 (nothing below mat line)
+      const img30 = frameImages[30];
+      let minX = 256, maxX = -1, minY = 240, maxY = -1;
+      let nonBgCount = 0;
+
+      for (let y = 48; y < 240; y++) {
+        for (let x = 0; x < 256; x++) {
+          if (img30.getPixelColor(x, y) !== emptyFrame.getPixelColor(x, y)) {
+            nonBgCount++;
+            if (x < minX) minX = x;
+            if (x > maxX) maxX = x;
+            if (y < minY) minY = y;
+            if (y > maxY) maxY = y;
           }
         }
-        return -1;
       }
 
-      const topRow0 = findTopOpponentRow(frameImages[0]);
-      const topRow30 = findTopOpponentRow(frameImages[30]);
-
-      expect(topRow0, `${oppId} KO frame 0 has opponent`).toBeGreaterThan(0);
-      expect(topRow30, `${oppId} KO frame 30 has opponent`).toBeGreaterThan(0);
-      expect(topRow30 - topRow0, `${oppId} moves down by >= 30 px between frame 0 and 30`).toBeGreaterThanOrEqual(30);
-
-      // Requirement 12: the opponent is clipped at the ring floor line (y = 190) and
-      // never slides past it. At frames 30 and 40 no opponent pixel may lie below it.
-      const FLOOR_LINE = 190;
-      function countPixelsBelowFloor(img: any): number {
-        let count = 0;
-        for (let y = FLOOR_LINE; y < 240; y++) {
-          for (let x = 0; x < 256; x++) {
-            if (img.getPixelColor(x, y) !== emptyFrame.getPixelColor(x, y)) {
-              count++;
-            }
-          }
-        }
-        return count;
+      expect(nonBgCount, `${oppId} KO frame 30 has opponent`).toBeGreaterThan(100);
+      const hSpan = maxX - minX + 1;
+      const vSpan = maxY - minY + 1;
+      expect(hSpan, `${oppId} KO frame 30 horizontal span >= 100 px`).toBeGreaterThanOrEqual(100);
+      if (oppId === 'medi_jinx' || oppId === 'maga_man') {
+        expect(vSpan, `${oppId} KO frame 30 vertical span <= 90 px`).toBeLessThanOrEqual(90);
       }
-
-      for (const n of [30, 40]) {
-        expect(
-          countPixelsBelowFloor(frameImages[n]),
-          `${oppId} KO frame ${n} draws no opponent pixels below floor line y=${FLOOR_LINE}`
-        ).toBe(0);
-      }
-
-      // Assert KO sprite is absent in exactly one of frames 40 and 44 (blink)
-      function countSpritePixelsVsEmpty(img: any): number {
-        let count = 0;
-        for (let y = 48; y < 220; y++) {
-          for (let x = 40; x < 216; x++) {
-            const p = img.getPixelColor(x, y);
-            const pEmpty = emptyFrame.getPixelColor(x, y);
-            if (p !== pEmpty) {
-              count++;
-            }
-          }
-        }
-        return count;
-      }
-
-      const pixels40 = countSpritePixelsVsEmpty(frameImages[40]);
-      const pixels44 = countSpritePixelsVsEmpty(frameImages[44]);
-
-      const hasSprite40 = pixels40 > 150;
-      const hasSprite44 = pixels44 > 150;
-
-      expect(
-        (hasSprite40 && !hasSprite44) || (!hasSprite40 && hasSprite44),
-        `${oppId} KO sprite is absent in exactly one of frame 40 and 44 (40: ${pixels40}, 44: ${pixels44})`
-      ).toBe(true);
+      expect(maxY, `${oppId} KO frame 30 bottom row <= 192`).toBeLessThanOrEqual(192);
     });
   }
 });
