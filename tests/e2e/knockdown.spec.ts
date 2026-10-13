@@ -123,7 +123,7 @@ test.describe('Real knockdown in play', () => {
     expect(empty.width, 'reference frame has the same scale').toBe(live!.width);
 
     // Find the opponent's bounding box where the live frame differs from the opponent-less reference.
-    // Scan the ring area x 50-205 below the crowd flash (y >= 88), skipping the referee box and player area (x >= 152 below 168).
+    // Scan the ring area x 50-205 below the crowd flash (y >= 88), skipping the referee box and player area (x >= 152 and y >= 135).
     let minOppX = 256, maxOppX = -1, minOppY = 240, maxOppY = -1;
     let diffCount = 0;
     for (let y = 88; y <= 192; y++) {
@@ -131,7 +131,7 @@ test.describe('Real knockdown in play', () => {
         if (x >= REFEREE_BOX.x0 && x <= REFEREE_BOX.x1 && y >= REFEREE_BOX.y0 && y <= REFEREE_BOX.y1) {
           continue;
         }
-        if (x >= 152 && y >= 168) {
+        if (x >= 152 && y >= 135) {
           continue;
         }
         if (!same(blockPx(live!, x, y, k), blockPx(empty, x, y, k))) {
@@ -151,7 +151,7 @@ test.describe('Real knockdown in play', () => {
     expect(maxOppY, 'opponent bottom is <= y 192').toBeLessThanOrEqual(192);
 
     // (b) The fallen opponent is drawn in his own (dark) colors, not a white silhouette.
-    // Opponent-only region: above the player (y <= 167) and below the crowd (y >= 88).
+    // Opponent-only region: above the player's lower body/step aside (skipping x >= 152) and below the crowd (y >= 88).
     const white20 = nesToRgba(0x20);
     const white30 = nesToRgba(0x30);
     let opponentPixels = 0;
@@ -159,6 +159,9 @@ test.describe('Real knockdown in play', () => {
     for (let y = 88; y <= 167; y++) {
       for (let x = 60; x < 196; x++) {
         if (x >= REFEREE_BOX.x0 && x <= REFEREE_BOX.x1 && y >= REFEREE_BOX.y0 && y <= REFEREE_BOX.y1) {
+          continue;
+        }
+        if (x >= 152 && y >= 135) {
           continue;
         }
         const livePx = blockPx(live!, x, y, k);

@@ -97,10 +97,14 @@ function drawBitmapTextOnJimp(
 test.describe('Pose Preview and Contact Sheets Suite', () => {
   const screenshotsDir = path.resolve(process.cwd(), 'screenshots');
   const posesDir = path.join(screenshotsDir, 'poses');
+  const playerDir = path.join(screenshotsDir, 'player');
 
   test.beforeAll(() => {
     if (!fs.existsSync(posesDir)) {
       fs.mkdirSync(posesDir, { recursive: true });
+    }
+    if (!fs.existsSync(playerDir)) {
+      fs.mkdirSync(playerDir, { recursive: true });
     }
   });
 
@@ -149,6 +153,104 @@ test.describe('Pose Preview and Contact Sheets Suite', () => {
       verifyPngNesPalette(screenshotPath);
     });
   }
+
+  // 2b. Player frames: screenshots/player/<frame>.png and screenshots/player/contact.png
+  const PLAYER_FRAME_TESTS: { name: string; query: string }[] = [
+    { name: 'IDLE_A', query: 'player=IDLE&frame=0' },
+    { name: 'IDLE_B', query: 'player=IDLE&frame=16' },
+    { name: 'JAB_L_WIND', query: 'player=PUNCH_LEFT_HEAD&pframe=0' },
+    { name: 'JAB_L_HIT', query: 'player=PUNCH_LEFT_HEAD&pframe=5' },
+    { name: 'JAB_L_BACK', query: 'player=PUNCH_LEFT_HEAD&pframe=10' },
+    { name: 'JAB_R_WIND', query: 'player=PUNCH_RIGHT_HEAD&pframe=0' },
+    { name: 'JAB_R_HIT', query: 'player=PUNCH_RIGHT_HEAD&pframe=5' },
+    { name: 'JAB_R_BACK', query: 'player=PUNCH_RIGHT_HEAD&pframe=10' },
+    { name: 'BODY_L_WIND', query: 'player=PUNCH_LEFT_BODY&pframe=0' },
+    { name: 'BODY_L_HIT', query: 'player=PUNCH_LEFT_BODY&pframe=5' },
+    { name: 'BODY_L_BACK', query: 'player=PUNCH_LEFT_BODY&pframe=10' },
+    { name: 'BODY_R_WIND', query: 'player=PUNCH_RIGHT_BODY&pframe=0' },
+    { name: 'BODY_R_HIT', query: 'player=PUNCH_RIGHT_BODY&pframe=5' },
+    { name: 'BODY_R_BACK', query: 'player=PUNCH_RIGHT_BODY&pframe=10' },
+    { name: 'STAR_WIND', query: 'player=STAR_PUNCH&pframe=2' },
+    { name: 'STAR_HIT', query: 'player=STAR_PUNCH&pframe=10' },
+    { name: 'STAR_BACK', query: 'player=STAR_PUNCH&pframe=18' },
+    { name: 'DODGE_L_HALF', query: 'player=DODGE_LEFT&pframe=1' },
+    { name: 'DODGE_L', query: 'player=DODGE_LEFT&pframe=6' },
+    { name: 'DODGE_R_HALF', query: 'player=DODGE_RIGHT&pframe=1' },
+    { name: 'DODGE_R', query: 'player=DODGE_RIGHT&pframe=6' },
+    { name: 'DUCK', query: 'player=DUCK&pframe=0' },
+    { name: 'BLOCK', query: 'player=BLOCK&pframe=0' },
+    { name: 'HIT', query: 'player=HIT&pframe=6' },
+    { name: 'EXHAUSTED_A', query: 'player=IDLE&exh=1&frame=0' },
+    { name: 'EXHAUSTED_B', query: 'player=IDLE&exh=1&frame=12' },
+    { name: 'FALL', query: 'player=KNOCKED_DOWN&pframe=5' },
+    { name: 'DOWN', query: 'player=KNOCKED_DOWN&pframe=15' },
+    { name: 'GET_UP', query: 'player=KNOCKED_DOWN&mash=1' },
+    { name: 'WIN', query: 'player=WIN' },
+  ];
+
+  for (const fItem of PLAYER_FRAME_TESTS) {
+    test(`player frame screenshot: ${fItem.name}`, async ({ page }) => {
+      const pageErrors: Error[] = [];
+      page.on('pageerror', (err) => pageErrors.push(err));
+
+      const targetUrl = `./?pose=aint_man&action=IDLE&${fItem.query}`;
+      await page.goto(targetUrl);
+
+      const canvas = page.locator('canvas.game-canvas');
+      await expect(canvas).toBeVisible();
+      await page.waitForTimeout(50);
+
+      expect(pageErrors).toHaveLength(0);
+
+      const screenshotPath = path.join(playerDir, `${fItem.name}.png`);
+      await canvas.screenshot({ path: screenshotPath });
+
+      verifyPngNesPalette(screenshotPath);
+    });
+  }
+
+  test('player contact sheet: screenshots/player/contact.png', async () => {
+    // 5 columns by 6 rows grid for the 30 frames
+    const cols = 5;
+    const rows = Math.ceil(PLAYER_FRAME_TESTS.length / cols);
+    const cellW = 256;
+    const cellH = 240;
+    const labelH = 16;
+    const totalCellH = cellH + labelH;
+    const totalW = cols * cellW;
+    const totalH = rows * totalCellH;
+
+    const sheet = new Jimp({ width: totalW, height: totalH, color: 0x000000ff });
+
+    for (let i = 0; i < PLAYER_FRAME_TESTS.length; i++) {
+      const fItem = PLAYER_FRAME_TESTS[i];
+      const posePath = path.join(playerDir, `${fItem.name}.png`);
+      expect(fs.existsSync(posePath), `Expected player frame screenshot ${posePath}`).toBe(true);
+
+      const frameImg = await Jimp.read(posePath);
+      if (frameImg.bitmap.width !== cellW || frameImg.bitmap.height !== cellH) {
+        frameImg.resize({ w: cellW, h: cellH });
+      }
+      const colIdx = i % cols;
+      const rowIdx = Math.floor(i / cols);
+      const posX = colIdx * cellW;
+      const posY = rowIdx * totalCellH;
+
+      // Composite pose canvas
+      sheet.composite(frameImg, posX, posY);
+
+      // Draw action label underneath cell
+      const textX = posX + Math.max(4, Math.floor((cellW - fItem.name.length * 8) / 2));
+      const textY = posY + cellH + 4;
+      drawBitmapTextOnJimp(sheet, fItem.name, textX, textY, 0xffffffff);
+    }
+
+    const contactPath = path.join(playerDir, 'contact.png');
+    const buffer = await sheet.getBuffer('image/png');
+    fs.writeFileSync(contactPath, buffer);
+    expect(fs.existsSync(contactPath)).toBe(true);
+    verifyPngNesPalette(contactPath);
+  });
 
   // 3. Contact Sheet generation per opponent: screenshots/contact-<opponent_id>.png
   for (const oppId of OPPONENT_IDS) {

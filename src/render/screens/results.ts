@@ -1,6 +1,7 @@
 import { nesToRgba } from '../nesPalette';
 import { drawBitmapText, drawBitmapText2x } from '../sprites/font';
-import { CANVAS_WIDTH, CANVAS_HEIGHT } from '../sprites/blit';
+import { blitSprite, CANVAS_WIDTH, CANVAS_HEIGHT } from '../sprites/blit';
+import { PLAYER_WIN, PLAYER_WIN_ANCHOR_X, PLAYER_DOWN, PLAYER_DOWN_ANCHOR_X } from '../sprites/generated/player';
 import { FightState } from '../../core/types';
 import { OPPONENT_PRESENTATION } from './presentationData';
 
@@ -66,15 +67,23 @@ export function renderResultsScreen(
   const winnerX = Math.round((CANVAS_WIDTH - winnerLabel.length * 8) / 2);
   drawBitmapText(setPixel, winnerLabel, winnerX, 68, 0x28);
 
-  // Victory / Defeat message
+  // Victory / Defeat message & Player sprite
   if (isWin) {
-    drawBitmapText2x(setPixel, 'YOU WIN!!', 56, 88, 0x28);
+    drawBitmapText2x(setPixel, 'YOU WIN!!', 56, 84, 0x28);
+    // Draw WIN player frame
+    const winX = 128 - PLAYER_WIN_ANCHOR_X;
+    const winY = 205 - (PLAYER_WIN.height - 1);
+    blitSprite(data, PLAYER_WIN, winX, winY);
   } else {
-    drawBitmapText2x(setPixel, 'YOU LOSE!!', 48, 88, 0x16);
+    drawBitmapText2x(setPixel, 'YOU LOSE!!', 48, 84, 0x16);
+    // Draw DOWN player frame
+    const downX = 128 - PLAYER_DOWN_ANCHOR_X;
+    const downY = 205 - (PLAYER_DOWN.height - 1);
+    blitSprite(data, PLAYER_DOWN, downX, downY);
   }
 
   // Stats Card
-  const statsStartY = 130;
+  const statsStartY = 136;
   for (let x = 24; x < CANVAS_WIDTH - 24; x++) {
     setPixel(x, statsStartY - 8, 0x20);
     setPixel(x, statsStartY + 56, 0x20);

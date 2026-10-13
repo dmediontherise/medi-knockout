@@ -5,10 +5,10 @@ import { IDLE_BASE_MEDI_JINX, MEDI_JINX_FRAMES } from './sprites/generated/medi_
 import { IDLE_BASE_DJ_TITO, DJ_TITO_FRAMES } from './sprites/generated/dj_tito';
 import { IDLE_BASE_MR_YANKEE, MR_YANKEE_FRAMES } from './sprites/generated/mr_yankee';
 import { IDLE_BASE_MAGA_MAN, MAGA_MAN_FRAMES } from './sprites/generated/maga_man';
-import { getPlayerSprite, PLAYER_BACK_IDLE } from './sprites/player';
+import { getPlayerSprite, resolvePlayerFrame, PLAYER_BACK_IDLE } from './sprites/player';
 import { toFlashPalette, toDarkPalette } from './nesPalette';
 
-export { PLAYER_BACK_IDLE };
+export { PLAYER_BACK_IDLE, resolvePlayerFrame };
 
 export const IDLE_BASES: Record<string, SpriteData> = {
   aint_man: IDLE_BASE_AINT_MAN,
@@ -318,23 +318,23 @@ export interface PlayerPoseTransform {
 
 export const PLAYER_POSES: Record<ActionType | string, PlayerPoseTransform> = {
   IDLE: { dx: 0, dy: 0, palette: 'normal', shake: 0, fall: false },
-  DODGE_LEFT: { dx: -24, dy: 0, palette: 'normal', shake: 0, fall: false },
-  DODGE_RIGHT: { dx: 24, dy: 0, palette: 'normal', shake: 0, fall: false },
-  DUCK: { dx: 0, dy: 12, palette: 'normal', shake: 0, fall: false },
-  BLOCK: { dx: 0, dy: -2, palette: 'dark', shake: 0, fall: false },
-  JAB_LEFT: { dx: -6, dy: -8, palette: 'normal', shake: 0, fall: false },
-  JAB_RIGHT: { dx: 6, dy: -8, palette: 'normal', shake: 0, fall: false },
-  PUNCH_LEFT_HEAD: { dx: -6, dy: -8, palette: 'normal', shake: 0, fall: false },
-  PUNCH_RIGHT_HEAD: { dx: 6, dy: -8, palette: 'normal', shake: 0, fall: false },
-  PUNCH_LEFT_BODY: { dx: -6, dy: -3, palette: 'normal', shake: 0, fall: false },
-  PUNCH_RIGHT_BODY: { dx: 6, dy: -3, palette: 'normal', shake: 0, fall: false },
-  HOOK_LEFT: { dx: -6, dy: -5, palette: 'normal', shake: 0, fall: false },
-  HOOK_RIGHT: { dx: 6, dy: -5, palette: 'normal', shake: 0, fall: false },
-  UPPERCUT: { dx: 0, dy: -10, palette: 'normal', shake: 0, fall: false },
-  STAR_PUNCH: { dx: 0, dy: -12, palette: 'flash', shake: 0, fall: false },
-  HIT: { dx: 2, dy: 2, palette: 'flash', shake: 3, fall: false },
-  KNOCKED_DOWN: { dx: 0, dy: 0, palette: 'dark', shake: 0, fall: false },
-  KO: { dx: 0, dy: 0, palette: 'dark', shake: 0, fall: false },
+  DODGE_LEFT: { dx: 0, dy: 0, palette: 'normal', shake: 0, fall: false },
+  DODGE_RIGHT: { dx: 0, dy: 0, palette: 'normal', shake: 0, fall: false },
+  DUCK: { dx: 0, dy: 0, palette: 'normal', shake: 0, fall: false },
+  BLOCK: { dx: 0, dy: 0, palette: 'normal', shake: 0, fall: false },
+  JAB_LEFT: { dx: 0, dy: 0, palette: 'normal', shake: 0, fall: false },
+  JAB_RIGHT: { dx: 0, dy: 0, palette: 'normal', shake: 0, fall: false },
+  PUNCH_LEFT_HEAD: { dx: 0, dy: 0, palette: 'normal', shake: 0, fall: false },
+  PUNCH_RIGHT_HEAD: { dx: 0, dy: 0, palette: 'normal', shake: 0, fall: false },
+  PUNCH_LEFT_BODY: { dx: 0, dy: 0, palette: 'normal', shake: 0, fall: false },
+  PUNCH_RIGHT_BODY: { dx: 0, dy: 0, palette: 'normal', shake: 0, fall: false },
+  HOOK_LEFT: { dx: 0, dy: 0, palette: 'normal', shake: 0, fall: false },
+  HOOK_RIGHT: { dx: 0, dy: 0, palette: 'normal', shake: 0, fall: false },
+  UPPERCUT: { dx: 0, dy: 0, palette: 'normal', shake: 0, fall: false },
+  STAR_PUNCH: { dx: 0, dy: 0, palette: 'normal', shake: 0, fall: false },
+  HIT: { dx: 0, dy: 0, palette: 'normal', shake: 2, fall: false },
+  KNOCKED_DOWN: { dx: 0, dy: 0, palette: 'normal', shake: 0, fall: false },
+  KO: { dx: 0, dy: 0, palette: 'normal', shake: 0, fall: false },
 };
 
 // Helper to apply palette effect ('flash' or 'dark') to a sprite

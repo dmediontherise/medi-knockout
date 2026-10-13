@@ -1,6 +1,6 @@
 import { nesToRgba } from '../nesPalette';
 import { drawBitmapText, drawBitmapText2x } from '../sprites/font';
-import { PLAYER_BACK_IDLE } from '../sprites/playerBack';
+import { PLAYER_IDLE_A, PLAYER_IDLE_A_ANCHOR_X } from '../sprites/generated/player';
 import { blitSprite, CANVAS_WIDTH, CANVAS_HEIGHT } from '../sprites/blit';
 
 export function renderTitleScreen(
@@ -61,11 +61,10 @@ export function renderTitleScreen(
   drawBitmapText(setPixel, 'CHAMPIONSHIP BOXING', 52, 70, 0x30);
   drawBitmapText(setPixel, '© 2026 MEDI PRODUCTIONS', 36, 82, 0x10);
 
-  // 4. Player back-view sprite, centered horizontally
-  // Player back sprite is 48x72. Centered at X = (256 - 48)/2 = 104, Y = 100
-  const playerX = Math.round((CANVAS_WIDTH - PLAYER_BACK_IDLE.width) / 2);
-  const playerY = 104;
-  blitSprite(data, PLAYER_BACK_IDLE, playerX, playerY);
+  // 4. Player back-view sprite: IDLE_A, centered horizontally with anchorX at 128
+  const playerX = 128 - PLAYER_IDLE_A_ANCHOR_X;
+  const playerY = 190 - (PLAYER_IDLE_A.height - 1);
+  blitSprite(data, PLAYER_IDLE_A, playerX, playerY);
 
   // 5. Blinking "PRESS START" (30-frame window: on 30 frames, off 30 frames)
   const isBlinkOn = Math.floor(frame / 30) % 2 === 0;

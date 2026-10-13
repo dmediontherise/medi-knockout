@@ -58,13 +58,26 @@ const App: React.FC = () => {
     if (poseOpponent) {
       const preview = createFight(poseOpponent, 12345);
       const actionFrameNum = frameParam !== null ? parseInt(frameParam, 10) : 0;
+      const pframeParam = params.get('pframe');
+      const pframeNum = pframeParam !== null ? parseInt(pframeParam, 10) : actionFrameNum;
+      const isMash = params.get('mash') === '1';
+      const isExh = params.get('exh') === '1';
+
       if (oppAction) {
         preview.opponent.action = oppAction as OpponentActionType;
         preview.opponent.actionFrame = actionFrameNum;
       }
       if (playerAction) {
         preview.player.action = playerAction as ActionType;
-        preview.player.actionFrame = actionFrameNum;
+        preview.player.actionFrame = pframeNum;
+      }
+      if (isExh) {
+        preview.player.isExhausted = true;
+      }
+      if (isMash) {
+        preview.referee.downFighter = 'PLAYER';
+        preview.referee.playerMashCount = 1;
+        preview.frame = 8; // Global frame 8 puts windowIdx = floor(8/8) = 1 (odd -> GET_UP)
       }
       setPosePreviewState(preview);
     }

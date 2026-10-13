@@ -2,7 +2,7 @@ import { FightState } from '../core/types';
 import { nesToRgba } from './nesPalette';
 import { drawRingBackground } from './sprites/ring';
 import { drawBitmapText, drawBitmapText2x } from './sprites/font';
-import { getOpponentSprite, resolvePlayerSprite, OPPONENT_POSES, PLAYER_POSES, getSpriteAnchor } from './poses';
+import { getOpponentSprite, resolvePlayerSprite, resolvePlayerFrame, OPPONENT_POSES, PLAYER_POSES, getSpriteAnchor } from './poses';
 import { REFEREE_SPRITES, getLargeCountDigitSprite } from './sprites/referee';
 import { SpriteData } from './sprites/types';
 import { SPARK_SPRITE, STAR_SPRITE } from './sprites/effects';
@@ -24,14 +24,17 @@ export function isPlayerSteppingAside(state: FightState): boolean {
 }
 
 // Compute the player draw position (and sprite) for a state. During the opponent's
-// count the player keeps his idle pose and is shifted to the right by at least
-// PLAYER_STEP_ASIDE_SHIFT so his left edge is at x >= PLAYER_STEP_ASIDE_MIN_X.
+// count the player keeps his idle pose and is shifted to the right so his
+// leftmost pixel is at x >= PLAYER_STEP_ASIDE_MIN_X.
 export function computePlayerDraw(state: FightState): { x: number; y: number; sprite: SpriteData } {
   const aside = isPlayerSteppingAside(state);
   const action = aside ? 'IDLE' : state.player.action;
   const actionFrame = aside ? 0 : (state.player.actionFrame || 0);
   const transform = PLAYER_POSES[action] || PLAYER_POSES['IDLE'];
-  const sprite = resolvePlayerSprite(action, state.player.isExhausted);
+
+  const resolved = resolvePlayerFrame(action, actionFrame, state);
+  const sprite = resolved.sprite;
+  const anchorX = resolved.anchorX;
 
   let shakeX = 0;
   if (transform.shake > 0) {
@@ -39,9 +42,33 @@ export function computePlayerDraw(state: FightState): { x: number; y: number; sp
     shakeX = sign * transform.shake;
   }
 
-  const baseX = Math.round(128 - sprite.width / 2) + transform.dx + shakeX;
-  const x = aside ? Math.max(baseX + PLAYER_STEP_ASIDE_SHIFT, PLAYER_STEP_ASIDE_MIN_X) : baseX;
-  const y = 168 + transform.dy;
+  // Standing frames drawn with frame's bottom row at canvas y = 239,
+  // and anchorX at canvas x = 128 (DOWN and FALL included).
+  const baseX = 128 - anchorX + shakeX;
+  const y = 239 - (sprite.height - 1);
+
+  // When stepping aside, leftmost pixel must be at x >= PLAYER_STEP_ASIDE_MIN_X
+  // Find leftmost opaque pixel relative to sprite origin
+  let spriteMinOpaqueX = 0;
+  for (const row of sprite.rows) {
+    for (let c = 0; c < row.length; c++) {
+      if (row[c] !== '.' && row[c] !== ' ') {
+        if (c < spriteMinOpaqueX || spriteMinOpaqueX === 0) {
+          spriteMinOpaqueX = c;
+        }
+        break;
+      }
+    }
+  }
+
+  let x = baseX;
+  if (aside) {
+    // We want x + spriteMinOpaqueX >= PLAYER_STEP_ASIDE_MIN_X
+    const asideShiftedX = baseX + PLAYER_STEP_ASIDE_SHIFT;
+    const minRequiredX = PLAYER_STEP_ASIDE_MIN_X - spriteMinOpaqueX;
+    x = Math.max(asideShiftedX, minRequiredX);
+  }
+
   return { x, y, sprite };
 }
 

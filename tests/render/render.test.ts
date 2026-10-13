@@ -13,7 +13,7 @@ import {
   IDLE_BASES,
   PLAYER_POSES,
 } from '../../src/render/poses';
-import { getPlayerSprite, PLAYER_BACK_IDLE } from '../../src/render/sprites/player';
+import { getPlayerSprite, resolvePlayerFrame, PLAYER_BACK_IDLE } from '../../src/render/sprites/player';
 import { REFEREE_SPRITES, getLargeCountDigitSprite } from '../../src/render/sprites/referee';
 import { SpriteData } from '../../src/render/sprites/types';
 import { renderFrame, CANVAS_WIDTH, CANVAS_HEIGHT, COUNT_DIGIT_X, COUNT_DIGIT_Y, computePlayerDraw, computeOpponentDraw, isPlayerSteppingAside, PLAYER_STEP_ASIDE_MIN_X } from '../../src/render/renderFrame';
@@ -369,17 +369,17 @@ describe('Character Sprite Palettes and Dimensions', () => {
       'KO',
     ];
 
-    it('all player poses are 60-90 px tall, >= 40 px wide and <= 12 NES colors', () => {
+    it('all player poses are 15-105 px tall, >= 40 px wide and <= 12 NES colors', () => {
       for (const action of PLAYER_ACTIONS) {
         const normal = getPlayerSprite(action, false);
-        expect(normal.height).toBeGreaterThanOrEqual(60);
-        expect(normal.height).toBeLessThanOrEqual(90);
+        expect(normal.height).toBeGreaterThanOrEqual(15);
+        expect(normal.height).toBeLessThanOrEqual(105);
         expect(normal.width).toBeGreaterThanOrEqual(40);
         checkSpriteColors(normal, 12);
 
         const exhausted = getPlayerSprite(action, true);
-        expect(exhausted.height).toBeGreaterThanOrEqual(60);
-        expect(exhausted.height).toBeLessThanOrEqual(90);
+        expect(exhausted.height).toBeGreaterThanOrEqual(15);
+        expect(exhausted.height).toBeLessThanOrEqual(105);
         expect(exhausted.width).toBeGreaterThanOrEqual(40);
         checkSpriteColors(exhausted, 12);
       }
@@ -417,47 +417,53 @@ describe('Character Sprite Palettes and Dimensions', () => {
       return { ctx, buffer };
     }
 
-    it('M15: player sprite x shifts >= 24 px on dodge, y shifts >= 12 px on duck', () => {
+    it('M15: the head moves >= 16 px on dodge and >= 16 px down on duck', () => {
       const idle = createFight('aint_man', 123); idle.player.action = 'IDLE';
-      const dodgeL = createFight('aint_man', 123); dodgeL.player.action = 'DODGE_LEFT';
-      const dodgeR = createFight('aint_man', 123); dodgeR.player.action = 'DODGE_RIGHT';
+      const dodgeL = createFight('aint_man', 123); dodgeL.player.action = 'DODGE_LEFT'; dodgeL.player.actionFrame = 6;
+      const dodgeR = createFight('aint_man', 123); dodgeR.player.action = 'DODGE_RIGHT'; dodgeR.player.actionFrame = 6;
       const duck = createFight('aint_man', 123); duck.player.action = 'DUCK';
 
-      const mockIdle = createMockCanvas(); renderFrame(mockIdle.ctx, idle);
-      const mockDodgeL = createMockCanvas(); renderFrame(mockDodgeL.ctx, dodgeL);
-      const mockDodgeR = createMockCanvas(); renderFrame(mockDodgeR.ctx, dodgeR);
-      const mockDuck = createMockCanvas(); renderFrame(mockDuck.ctx, duck);
+      function getHeadMetrics(fight: any) {
+        const draw = computePlayerDraw(fight);
+        // Find center of black hair in rows 0-30 of the player sprite
+        let sumX = 0;
+        let sumY = 0;
+        let count = 0;
+        let topY = CANVAS_HEIGHT;
 
-      function findPlayerBounds(buf: Uint8ClampedArray) {
-        let minX = CANVAS_WIDTH, maxX = 0, minY = CANVAS_HEIGHT, maxY = 0;
-        for (let y = 168; y < CANVAS_HEIGHT; y++) {
-          for (let x = 0; x < CANVAS_WIDTH; x++) {
-            const idx = (y * CANVAS_WIDTH + x) * 4;
-            const r = buf[idx], g = buf[idx+1], b = buf[idx+2];
-            // Player gloves are red (0x16: 181, 49, 32 or 0x26: 254, 129, 112)
-            if ((r === 181 && g === 49 && b === 32) || (r === 254 && g === 129 && b === 112)) {
-              if (x < minX) minX = x;
-              if (x > maxX) maxX = x;
-              if (y < minY) minY = y;
-              if (y > maxY) maxY = y;
+        for (let r = 0; r < Math.min(30, draw.sprite.height); r++) {
+          const row = draw.sprite.rows[r];
+          for (let c = 0; c < row.length; c++) {
+            if (row[c] === 'B' || row[c] === 'G') {
+              const canvasX = draw.x + c;
+              const canvasY = draw.y + r;
+              sumX += canvasX;
+              sumY += canvasY;
+              count++;
+              if (canvasY < topY) topY = canvasY;
             }
           }
         }
-        return { minX, maxX, minY, maxY };
+
+        return {
+          cx: count > 0 ? sumX / count : draw.x + draw.sprite.width / 2,
+          cy: count > 0 ? sumY / count : draw.y,
+          topY,
+        };
       }
 
-      const bIdle = findPlayerBounds(mockIdle.buffer);
-      const bDodgeL = findPlayerBounds(mockDodgeL.buffer);
-      const bDodgeR = findPlayerBounds(mockDodgeR.buffer);
-      const bDuck = findPlayerBounds(mockDuck.buffer);
+      const hIdle = getHeadMetrics(idle);
+      const hDodgeL = getHeadMetrics(dodgeL);
+      const hDodgeR = getHeadMetrics(dodgeR);
+      const hDuck = getHeadMetrics(duck);
 
-      const shiftL = bIdle.minX - bDodgeL.minX;
-      const shiftR = bDodgeR.minX - bIdle.minX;
-      const shiftDuck = bDuck.minY - bIdle.minY;
+      const shiftL = hIdle.cx - hDodgeL.cx;
+      const shiftR = hDodgeR.cx - hIdle.cx;
+      const shiftDuck = hDuck.topY - hIdle.topY;
 
-      expect(shiftL).toBeGreaterThanOrEqual(24);
-      expect(shiftR).toBeGreaterThanOrEqual(24);
-      expect(shiftDuck).toBeGreaterThanOrEqual(12);
+      expect(shiftL, 'dodge left shifts head >= 16 px').toBeGreaterThanOrEqual(16);
+      expect(shiftR, 'dodge right shifts head >= 16 px').toBeGreaterThanOrEqual(16);
+      expect(shiftDuck, 'duck moves head down >= 16 px').toBeGreaterThanOrEqual(16);
     });
 
     it('M16: HUD rows y < 48 are not all one color', () => {
@@ -1447,6 +1453,445 @@ describe('Task 012: Real animation frames from sheets', () => {
       }
       expect(clippedDiffCount, `${id} R5 clip: fails if bottom 4 rows are clipped`).not.toBe(expectedUncovered);
     }
+  });
+});
+
+describe('Task 014: Animated player rig', () => {
+  const FRAME_NAMES = [
+    'IDLE_A', 'IDLE_B',
+    'JAB_L_WIND', 'JAB_L_HIT', 'JAB_L_BACK',
+    'JAB_R_WIND', 'JAB_R_HIT', 'JAB_R_BACK',
+    'BODY_L_WIND', 'BODY_L_HIT', 'BODY_L_BACK',
+    'BODY_R_WIND', 'BODY_R_HIT', 'BODY_R_BACK',
+    'STAR_WIND', 'STAR_HIT', 'STAR_BACK',
+    'DODGE_L_HALF', 'DODGE_L',
+    'DODGE_R_HALF', 'DODGE_R',
+    'DUCK', 'BLOCK', 'HIT',
+    'EXHAUSTED_A', 'EXHAUSTED_B',
+    'FALL', 'DOWN', 'GET_UP', 'WIN'
+  ];
+
+  // Requirement 1: Generator checks palette and 1-px B outline
+  it('Requirement 1: every frame uses only valid NES palette letters and has a 1-px B outline around opaque pixels', () => {
+    const validLetters = new Set(['.', 'B', 'K', 'S', 'L', 'W', 'R', 'H', 'G']);
+
+    for (const name of FRAME_NAMES) {
+      const resolved = resolvePlayerFrame(name, 0);
+      const sprite = resolved.sprite;
+
+      expect(sprite.width, `${name} has positive width`).toBeGreaterThan(0);
+      expect(sprite.height, `${name} has positive height`).toBeGreaterThan(0);
+
+      for (let r = 0; r < sprite.height; r++) {
+        const row = sprite.rows[r];
+        for (let c = 0; c < sprite.width; c++) {
+          const ch = row[c];
+          expect(validLetters.has(ch), `${name} pixel at (${c},${r}) is valid letter '${ch}'`).toBe(true);
+
+          // 1-px B outline: every opaque pixel that has a transparent 4-neighbour is B
+          if (ch !== '.') {
+            const hasTransparentNeighbor =
+              r === 0 || r === sprite.height - 1 || c === 0 || c === sprite.width - 1 ||
+              sprite.rows[r - 1][c] === '.' ||
+              sprite.rows[r + 1][c] === '.' ||
+              row[c - 1] === '.' ||
+              row[c + 1] === '.';
+
+            if (hasTransparentNeighbor) {
+              expect(ch, `${name} perimeter pixel at (${c},${r}) must be 'B' outline`).toBe('B');
+            }
+          }
+        }
+      }
+    }
+  });
+
+  // Requirement 2: Action -> frame table mapping
+  it('Requirement 2: resolvePlayerFrame correctly maps every situation in the table', () => {
+    // IDLE: IDLE_A / IDLE_B, alternating every 16 global frames
+    expect(resolvePlayerFrame('IDLE', 0, { frame: 0 }).frameName).toBe('IDLE_A');
+    expect(resolvePlayerFrame('IDLE', 0, { frame: 15 }).frameName).toBe('IDLE_A');
+    expect(resolvePlayerFrame('IDLE', 0, { frame: 16 }).frameName).toBe('IDLE_B');
+    expect(resolvePlayerFrame('IDLE', 0, { frame: 31 }).frameName).toBe('IDLE_B');
+    expect(resolvePlayerFrame('IDLE', 0, { frame: 32 }).frameName).toBe('IDLE_A');
+
+    // PUNCH_LEFT_HEAD: 0-3 WIND, 4-8 HIT, 9+ BACK
+    expect(resolvePlayerFrame('PUNCH_LEFT_HEAD', 0).frameName).toBe('JAB_L_WIND');
+    expect(resolvePlayerFrame('PUNCH_LEFT_HEAD', 3).frameName).toBe('JAB_L_WIND');
+    expect(resolvePlayerFrame('PUNCH_LEFT_HEAD', 4).frameName).toBe('JAB_L_HIT');
+    expect(resolvePlayerFrame('PUNCH_LEFT_HEAD', 8).frameName).toBe('JAB_L_HIT');
+    expect(resolvePlayerFrame('PUNCH_LEFT_HEAD', 9).frameName).toBe('JAB_L_BACK');
+    expect(resolvePlayerFrame('PUNCH_LEFT_HEAD', 13).frameName).toBe('JAB_L_BACK');
+
+    // PUNCH_RIGHT_HEAD: R frames
+    expect(resolvePlayerFrame('PUNCH_RIGHT_HEAD', 0).frameName).toBe('JAB_R_WIND');
+    expect(resolvePlayerFrame('PUNCH_RIGHT_HEAD', 4).frameName).toBe('JAB_R_HIT');
+    expect(resolvePlayerFrame('PUNCH_RIGHT_HEAD', 9).frameName).toBe('JAB_R_BACK');
+
+    // PUNCH_*_BODY: BODY frames
+    expect(resolvePlayerFrame('PUNCH_LEFT_BODY', 2).frameName).toBe('BODY_L_WIND');
+    expect(resolvePlayerFrame('PUNCH_LEFT_BODY', 5).frameName).toBe('BODY_L_HIT');
+    expect(resolvePlayerFrame('PUNCH_LEFT_BODY', 10).frameName).toBe('BODY_L_BACK');
+    expect(resolvePlayerFrame('PUNCH_RIGHT_BODY', 1).frameName).toBe('BODY_R_WIND');
+    expect(resolvePlayerFrame('PUNCH_RIGHT_BODY', 6).frameName).toBe('BODY_R_HIT');
+    expect(resolvePlayerFrame('PUNCH_RIGHT_BODY', 11).frameName).toBe('BODY_R_BACK');
+
+    // STAR_PUNCH: 0-7 WIND, 8-15 HIT, 16+ BACK
+    expect(resolvePlayerFrame('STAR_PUNCH', 0).frameName).toBe('STAR_WIND');
+    expect(resolvePlayerFrame('STAR_PUNCH', 7).frameName).toBe('STAR_WIND');
+    expect(resolvePlayerFrame('STAR_PUNCH', 8).frameName).toBe('STAR_HIT');
+    expect(resolvePlayerFrame('STAR_PUNCH', 15).frameName).toBe('STAR_HIT');
+    expect(resolvePlayerFrame('STAR_PUNCH', 16).frameName).toBe('STAR_BACK');
+
+    // DODGE_LEFT: 0-3 and 18+ DODGE_L_HALF, 4-17 DODGE_L
+    expect(resolvePlayerFrame('DODGE_LEFT', 0).frameName).toBe('DODGE_L_HALF');
+    expect(resolvePlayerFrame('DODGE_LEFT', 3).frameName).toBe('DODGE_L_HALF');
+    expect(resolvePlayerFrame('DODGE_LEFT', 4).frameName).toBe('DODGE_L');
+    expect(resolvePlayerFrame('DODGE_LEFT', 17).frameName).toBe('DODGE_L');
+    expect(resolvePlayerFrame('DODGE_LEFT', 18).frameName).toBe('DODGE_L_HALF');
+    expect(resolvePlayerFrame('DODGE_LEFT', 21).frameName).toBe('DODGE_L_HALF');
+
+    // DODGE_RIGHT: mirrors
+    expect(resolvePlayerFrame('DODGE_RIGHT', 2).frameName).toBe('DODGE_R_HALF');
+    expect(resolvePlayerFrame('DODGE_RIGHT', 10).frameName).toBe('DODGE_R');
+    expect(resolvePlayerFrame('DODGE_RIGHT', 19).frameName).toBe('DODGE_R_HALF');
+
+    // DUCK, BLOCK, HIT
+    expect(resolvePlayerFrame('DUCK', 5).frameName).toBe('DUCK');
+    expect(resolvePlayerFrame('BLOCK', 5).frameName).toBe('BLOCK');
+    expect(resolvePlayerFrame('HIT', 2).frameName).toBe('HIT');
+
+    // isExhausted and idle: EXHAUSTED_A / B, alternating every 12 frames, pink palette
+    const exhA = resolvePlayerFrame('IDLE', 0, { frame: 0, player: { isExhausted: true } });
+    expect(exhA.frameName).toBe('EXHAUSTED_A');
+    expect(exhA.sprite.palette['S']).toBe(0x25); // Pink skin
+
+    const exhB = resolvePlayerFrame('IDLE', 0, { frame: 12, player: { isExhausted: true } });
+    expect(exhB.frameName).toBe('EXHAUSTED_B');
+    expect(exhB.sprite.palette['S']).toBe(0x25);
+
+    // KNOCKED_DOWN / KO: 0-11 FALL, 12+ DOWN
+    expect(resolvePlayerFrame('KNOCKED_DOWN', 0).frameName).toBe('FALL');
+    expect(resolvePlayerFrame('KNOCKED_DOWN', 11).frameName).toBe('FALL');
+    expect(resolvePlayerFrame('KNOCKED_DOWN', 12).frameName).toBe('DOWN');
+    expect(resolvePlayerFrame('KO', 15).frameName).toBe('DOWN');
+
+    // KNOCKED_DOWN with referee.downFighter === 'PLAYER' and playerMashCount >= 1
+    const mashGetUp = resolvePlayerFrame('KNOCKED_DOWN', 15, {
+      frame: 8, // window 1 (odd)
+      referee: { downFighter: 'PLAYER', playerMashCount: 1 },
+    });
+    expect(mashGetUp.frameName).toBe('GET_UP');
+
+    const mashDown = resolvePlayerFrame('KNOCKED_DOWN', 15, {
+      frame: 0, // window 0 (even)
+      referee: { downFighter: 'PLAYER', playerMashCount: 1 },
+    });
+    expect(mashDown.frameName).toBe('DOWN');
+  });
+
+  // Requirement 3: Not shifted stills (for every shift |dx|, |dy| <= 24, D >= 150)
+  it('Requirement 3: every non-idle frame differs from IDLE_A by D >= 150 pixels for all shifts |dx|, |dy| <= 24', () => {
+    const idleA = resolvePlayerFrame('IDLE', 0, { frame: 0 }).sprite;
+    const idleAnchorX = resolvePlayerFrame('IDLE', 0, { frame: 0 }).anchorX;
+
+    // Convert idleA into a rig coordinate grid:
+    // rig y range: 0..103, rig x range: -30..30
+    const IDLE_H = idleA.height;
+    const IDLE_W = idleA.width;
+
+    for (const name of FRAME_NAMES) {
+      if (name === 'IDLE_A' || name === 'IDLE_B') continue;
+
+      const f = resolvePlayerFrame(name, 0).sprite;
+      const fAnchorX = resolvePlayerFrame(name, 0).anchorX;
+      const fH = f.height;
+      const fW = f.width;
+
+      let minDiff = Infinity;
+      for (let dy = -24; dy <= 24; dy++) {
+        for (let dx = -24; dx <= 24; dx++) {
+          // Bounding box of f and shifted idleA in rig coordinates:
+          // In rig coords, for f:
+          // x in [-fAnchorX, fW - 1 - fAnchorX]
+          // y in [103 - (fH - 1), 103]
+          // For shifted idleA:
+          // x in [-idleAnchorX + dx, IDLE_W - 1 - idleAnchorX + dx]
+          // y in [103 - (IDLE_H - 1) + dy, 103 + dy]
+          const minX = Math.min(-fAnchorX, -idleAnchorX + dx);
+          const maxX = Math.max(fW - 1 - fAnchorX, IDLE_W - 1 - idleAnchorX + dx);
+          const minY = Math.min(103 - (fH - 1), 103 - (IDLE_H - 1) + dy);
+          const maxY = Math.max(103, 103 + dy);
+
+          let diffCount = 0;
+          for (let y = minY; y <= maxY; y++) {
+            const rf = y - 103 + (fH - 1);
+            const ri = (y - dy) - 103 + (IDLE_H - 1);
+            const rowF = (rf >= 0 && rf < fH) ? f.rows[rf] : null;
+            const rowI = (ri >= 0 && ri < IDLE_H) ? idleA.rows[ri] : null;
+
+            for (let x = minX; x <= maxX; x++) {
+              const cf = x + fAnchorX;
+              const ci = (x - dx) + idleAnchorX;
+              const chF = (rowF && cf >= 0 && cf < fW) ? rowF[cf] : '.';
+              const chI = (rowI && ci >= 0 && ci < IDLE_W) ? rowI[ci] : '.';
+
+              if (chF !== chI) {
+                diffCount++;
+              }
+            }
+          }
+
+          if (diffCount < minDiff) {
+            minDiff = diffCount;
+          }
+        }
+      }
+
+      expect(minDiff, `Frame ${name} differs from shifted IDLE_A by >= 150 px (got ${minDiff})`).toBeGreaterThanOrEqual(150);
+    }
+  }, 30000);
+
+  // Requirement 4: Pose geometry
+  it('Requirement 4: generated frames satisfy all pose geometry constraints', () => {
+    const idleA = resolvePlayerFrame('IDLE', 0, { frame: 0 }).sprite;
+    const idleAnchor = resolvePlayerFrame('IDLE', 0, { frame: 0 }).anchorX;
+
+    function getRedPixels(sprite: SpriteData, anchorX: number, xFilter?: (x: number) => boolean) {
+      const pts: { x: number; y: number }[] = [];
+      for (let r = 0; r < sprite.height; r++) {
+        const y = (r - (sprite.height - 1)) + 103; // rig y (bottom row of standing frames)
+        const row = sprite.rows[r];
+        for (let c = 0; c < sprite.width; c++) {
+          const ch = row[c];
+          if (ch === 'R' || ch === 'H') {
+            const x = c - anchorX; // rig x
+            if (!xFilter || xFilter(x)) {
+              pts.push({ x, y });
+            }
+          }
+        }
+      }
+      return pts;
+    }
+
+    const idleLGloves = getRedPixels(idleA, idleAnchor, (x) => x < -5);
+    const idleRGloves = getRedPixels(idleA, idleAnchor, (x) => x > 5);
+    const idleLTop = Math.min(...idleLGloves.map((p) => p.y));
+    const idleRTop = Math.min(...idleRGloves.map((p) => p.y));
+
+    // 1. JAB_L_HIT:
+    // - left glove's red pixels have top >= 24 px above IDLE_A's glove top
+    // - opaque area <= 80% of IDLE_A's left glove area
+    // - right glove box within 2 px of IDLE_A's
+    const jabL = resolvePlayerFrame('PUNCH_LEFT_HEAD', 5).sprite;
+    const jabLAnchor = resolvePlayerFrame('PUNCH_LEFT_HEAD', 5).anchorX;
+    const jabLGloves = getRedPixels(jabL, jabLAnchor, (x) => x < 0);
+    const jabLTop = Math.min(...jabLGloves.map((p) => p.y));
+    expect(idleLTop - jabLTop, 'JAB_L_HIT left glove top >= 24 px above IDLE_A').toBeGreaterThanOrEqual(24);
+    expect(jabLGloves.length / idleLGloves.length, 'JAB_L_HIT left glove area <= 80% of IDLE_A').toBeLessThanOrEqual(0.8);
+
+    const jabRGloves = getRedPixels(jabL, jabLAnchor, (x) => x > 5);
+    const idleRBox = {
+      minX: Math.min(...idleRGloves.map((p) => p.x)),
+      maxX: Math.max(...idleRGloves.map((p) => p.x)),
+      minY: Math.min(...idleRGloves.map((p) => p.y)),
+      maxY: Math.max(...idleRGloves.map((p) => p.y)),
+    };
+    const jabRBox = {
+      minX: Math.min(...jabRGloves.map((p) => p.x)),
+      maxX: Math.max(...jabRGloves.map((p) => p.x)),
+      minY: Math.min(...jabRGloves.map((p) => p.y)),
+      maxY: Math.max(...jabRGloves.map((p) => p.y)),
+    };
+    expect(Math.abs(idleRBox.minX - jabRBox.minX), 'right glove minX within 2 px').toBeLessThanOrEqual(2);
+    expect(Math.abs(idleRBox.maxX - jabRBox.maxX), 'right glove maxX within 2 px').toBeLessThanOrEqual(2);
+    expect(Math.abs(idleRBox.minY - jabRBox.minY), 'right glove minY within 2 px').toBeLessThanOrEqual(2);
+    expect(Math.abs(idleRBox.maxY - jabRBox.maxY), 'right glove maxY within 2 px').toBeLessThanOrEqual(2);
+
+    // 2. JAB_R_HIT: mirror of JAB_L_HIT
+    const jabR = resolvePlayerFrame('PUNCH_RIGHT_HEAD', 5).sprite;
+    const jabRAnchor = resolvePlayerFrame('PUNCH_RIGHT_HEAD', 5).anchorX;
+    const jabRGlovesR = getRedPixels(jabR, jabRAnchor, (x) => x > 0);
+    const jabRTop = Math.min(...jabRGlovesR.map((p) => p.y));
+    expect(idleRTop - jabRTop, 'JAB_R_HIT right glove top >= 24 px above IDLE_A').toBeGreaterThanOrEqual(24);
+    expect(jabRGlovesR.length / idleRGloves.length, 'JAB_R_HIT right glove area <= 80%').toBeLessThanOrEqual(0.8);
+
+    // 3. BODY_L_HIT:
+    // left glove center is >= 6 px closer to the spine than in IDLE_A, and lower than JAB_L_HIT glove center by >= 30 px
+    const bodyL = resolvePlayerFrame('PUNCH_LEFT_BODY', 5).sprite;
+    const bodyLAnchor = resolvePlayerFrame('PUNCH_LEFT_BODY', 5).anchorX;
+    const bodyLGloves = getRedPixels(bodyL, bodyLAnchor, (x) => x < 0);
+    const bodyLCenterX = bodyLGloves.reduce((s, p) => s + p.x, 0) / bodyLGloves.length;
+    const bodyLCenterY = bodyLGloves.reduce((s, p) => s + p.y, 0) / bodyLGloves.length;
+    const idleLCenterX = idleLGloves.reduce((s, p) => s + p.x, 0) / idleLGloves.length;
+    const jabLCenterY = jabLGloves.reduce((s, p) => s + p.y, 0) / jabLGloves.length;
+    expect(Math.abs(idleLCenterX) - Math.abs(bodyLCenterX), 'body glove >= 6 px closer to spine').toBeGreaterThanOrEqual(6);
+    expect(bodyLCenterY - jabLCenterY, 'body glove lower than jab glove by >= 30 px').toBeGreaterThanOrEqual(30);
+
+    // 4. STAR_HIT: right glove top is above the head top (y < 0)
+    const starHit = resolvePlayerFrame('STAR_PUNCH', 10).sprite;
+    const starAnchor = resolvePlayerFrame('STAR_PUNCH', 10).anchorX;
+    const starRGloves = getRedPixels(starHit, starAnchor, (x) => x > 0);
+    const starRTop = Math.min(...starRGloves.map((p) => p.y));
+    expect(starRTop, 'STAR_HIT right glove top is above head top (y < 0)').toBeLessThan(0);
+
+    // 5. DODGE_L:
+    // head (B pixels in rows 0-24 of IDLE_A's head area, moved with frame) center x <= -16
+    // bottom 8 rows have opaque center x within 6 px of IDLE_A's
+    const dodgeL = resolvePlayerFrame('DODGE_LEFT', 6).sprite;
+    const dodgeLAnchor = resolvePlayerFrame('DODGE_LEFT', 6).anchorX;
+    const dodgeHeadX: number[] = [];
+    for (let r = 0; r < Math.min(30, dodgeL.height); r++) {
+      const y = (r - (dodgeL.height - 1)) + 99;
+      if (y <= 24) {
+        const row = dodgeL.rows[r];
+        for (let c = 0; c < dodgeL.width; c++) {
+          if (row[c] === 'B' || row[c] === 'G') {
+            dodgeHeadX.push(c - dodgeLAnchor);
+          }
+        }
+      }
+    }
+    const dodgeHeadCx = dodgeHeadX.reduce((s, v) => s + v, 0) / dodgeHeadX.length;
+    expect(dodgeHeadCx, 'DODGE_L head center x <= -16').toBeLessThanOrEqual(-16);
+
+    const idleBottomX: number[] = [];
+    for (let r = idleA.height - 8; r < idleA.height; r++) {
+      for (let c = 0; c < idleA.width; c++) {
+        if (idleA.rows[r][c] !== '.') idleBottomX.push(c - idleAnchor);
+      }
+    }
+    const dodgeBottomX: number[] = [];
+    for (let r = dodgeL.height - 8; r < dodgeL.height; r++) {
+      for (let c = 0; c < dodgeL.width; c++) {
+        if (dodgeL.rows[r][c] !== '.') dodgeBottomX.push(c - dodgeLAnchor);
+      }
+    }
+    const idleBottomCx = idleBottomX.reduce((s, v) => s + v, 0) / idleBottomX.length;
+    const dodgeBottomCx = dodgeBottomX.reduce((s, v) => s + v, 0) / dodgeBottomX.length;
+    expect(Math.abs(idleBottomCx - dodgeBottomCx), 'bottom 8 rows center x within 6 px of IDLE_A').toBeLessThanOrEqual(6);
+
+    // 6. DODGE_R: mirror
+    const dodgeR = resolvePlayerFrame('DODGE_RIGHT', 6).sprite;
+    const dodgeRAnchor = resolvePlayerFrame('DODGE_RIGHT', 6).anchorX;
+    const dodgeRHeadX: number[] = [];
+    for (let r = 0; r < Math.min(30, dodgeR.height); r++) {
+      const y = (r - (dodgeR.height - 1)) + 103;
+      if (y <= 24) {
+        const row = dodgeR.rows[r];
+        for (let c = 0; c < dodgeR.width; c++) {
+          if (row[c] === 'B' || row[c] === 'G') {
+            dodgeRHeadX.push(c - dodgeRAnchor);
+          }
+        }
+      }
+    }
+    const dodgeRHeadCx = dodgeRHeadX.reduce((s, v) => s + v, 0) / dodgeRHeadX.length;
+    expect(dodgeRHeadCx, 'DODGE_R head center x >= 16').toBeGreaterThanOrEqual(16);
+
+    // 7. DUCK:
+    // head top is >= 16 px lower than IDLE_A's, both gloves overlap head's x range
+    const duck = resolvePlayerFrame('DUCK', 5).sprite;
+    const duckAnchor = resolvePlayerFrame('DUCK', 5).anchorX;
+    let duckHeadMinY = Infinity;
+    let duckHeadMinX = Infinity;
+    let duckHeadMaxX = -Infinity;
+    for (let r = 0; r < Math.min(45, duck.height); r++) {
+      const y = (r - (duck.height - 1)) + 103;
+      const row = duck.rows[r];
+      for (let c = 0; c < duck.width; c++) {
+        if (row[c] === 'B' || row[c] === 'G') {
+          const x = c - duckAnchor;
+          if (y < duckHeadMinY) duckHeadMinY = y;
+          if (x < duckHeadMinX) duckHeadMinX = x;
+          if (x > duckHeadMaxX) duckHeadMaxX = x;
+        }
+      }
+    }
+    const idleHeadMinY = 0;
+    expect(duckHeadMinY - idleHeadMinY, 'duck head top >= 16 px lower').toBeGreaterThanOrEqual(16);
+
+    const duckLGloves = getRedPixels(duck, duckAnchor, (x) => x < 0);
+    const duckRGloves = getRedPixels(duck, duckAnchor, (x) => x > 0);
+    const duckLGloveMaxX = Math.max(...duckLGloves.map((p) => p.x));
+    const duckRGloveMinX = Math.min(...duckRGloves.map((p) => p.x));
+    expect(duckLGloveMaxX, 'left glove overlaps head x range').toBeGreaterThanOrEqual(duckHeadMinX);
+    expect(duckRGloveMinX, 'right glove overlaps head x range').toBeLessThanOrEqual(duckHeadMaxX);
+
+    // 8. BLOCK: both gloves' boxes intersect head's box
+    const block = resolvePlayerFrame('BLOCK', 0).sprite;
+    const blockAnchor = resolvePlayerFrame('BLOCK', 0).anchorX;
+    const blockHead = { minX: -10, maxX: 10, minY: 0, maxY: 24 };
+    const blockLGloves = getRedPixels(block, blockAnchor, (x) => x < 0);
+    const blockRGloves = getRedPixels(block, blockAnchor, (x) => x > 0);
+    const blockLBox = {
+      minX: Math.min(...blockLGloves.map((p) => p.x)),
+      maxX: Math.max(...blockLGloves.map((p) => p.x)),
+      minY: Math.min(...blockLGloves.map((p) => p.y)),
+      maxY: Math.max(...blockLGloves.map((p) => p.y)),
+    };
+    const blockRBox = {
+      minX: Math.min(...blockRGloves.map((p) => p.x)),
+      maxX: Math.max(...blockRGloves.map((p) => p.x)),
+      minY: Math.min(...blockRGloves.map((p) => p.y)),
+      maxY: Math.max(...blockRGloves.map((p) => p.y)),
+    };
+    const intersects = (b1: any, b2: any) =>
+      b1.minX <= b2.maxX && b1.maxX >= b2.minX && b1.minY <= b2.maxY && b1.maxY >= b2.minY;
+    expect(intersects(blockLBox, blockHead), 'block L glove intersects head box').toBe(true);
+    expect(intersects(blockRBox, blockHead), 'block R glove intersects head box').toBe(true);
+
+    // 9. EXHAUSTED_A: glove tops >= 20 px lower than IDLE_A's
+    const exhA = resolvePlayerFrame('IDLE', 0, { frame: 0, player: { isExhausted: true } }).sprite;
+    const exhAAnchor = resolvePlayerFrame('IDLE', 0, { frame: 0, player: { isExhausted: true } }).anchorX;
+    const exhLGloves = getRedPixels(exhA, exhAAnchor, (x) => x < 0);
+    const exhLTop = Math.min(...exhLGloves.map((p) => p.y));
+    expect(exhLTop - idleLTop, 'EXHAUSTED_A glove top >= 20 px lower than IDLE_A').toBeGreaterThanOrEqual(20);
+
+    // 10. DOWN: wider than tall, at most 40 px tall
+    const down = resolvePlayerFrame('KNOCKED_DOWN', 20).sprite;
+    expect(down.width, 'DOWN is wider than tall').toBeGreaterThan(down.height);
+    expect(down.height, 'DOWN is at most 40 px tall').toBeLessThanOrEqual(40);
+
+    // 11. WIN: both glove tops are above head top (y < 0)
+    const win = resolvePlayerFrame('WIN', 0).sprite;
+    const winAnchor = resolvePlayerFrame('WIN', 0).anchorX;
+    const winLGloves = getRedPixels(win, winAnchor, (x) => x < 0);
+    const winRGloves = getRedPixels(win, winAnchor, (x) => x > 0);
+    expect(Math.min(...winLGloves.map((p) => p.y)), 'WIN left glove top above head top').toBeLessThan(0);
+    expect(Math.min(...winRGloves.map((p) => p.y)), 'WIN right glove top above head top').toBeLessThan(0);
+  });
+
+  // Requirement 5: Bigger, higher, planted
+  it('Requirement 5: standing frames drawn with bottom row at canvas y = 239, anchorX at canvas x = 128, and IDLE head top at canvas y 132-146', () => {
+    const fight = createFight('aint_man', 123);
+    fight.player.action = 'IDLE';
+    fight.player.actionFrame = 0;
+    fight.frame = 0;
+
+    const draw = computePlayerDraw(fight);
+
+    // Bottom row of drawn frame is at canvas y = 239:
+    const drawnBottomRow = draw.y + (draw.sprite.height - 1);
+    expect(drawnBottomRow, 'bottom row lands at canvas y = 239').toBe(239);
+
+    // anchorX is at canvas x = 128:
+    const resolved = resolvePlayerFrame('IDLE', 0, fight);
+    const canvasAnchorX = draw.x + resolved.anchorX;
+    expect(canvasAnchorX, 'anchorX lands at canvas x = 128').toBe(128);
+
+    // On fight screen, IDLE head top is at canvas y 132-146
+    let minOpaqueRow = 0;
+    for (let r = 0; r < draw.sprite.height; r++) {
+      if (draw.sprite.rows[r].replace(/\./g, '').length > 0) {
+        minOpaqueRow = r;
+        break;
+      }
+    }
+    const canvasHeadTopY = draw.y + minOpaqueRow;
+    expect(canvasHeadTopY, 'IDLE head top is >= 132').toBeGreaterThanOrEqual(132);
+    expect(canvasHeadTopY, 'IDLE head top is <= 146').toBeLessThanOrEqual(146);
   });
 });
 
