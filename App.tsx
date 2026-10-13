@@ -8,6 +8,7 @@ import Background from './components/Background';
 import { GameState, PlayerAction } from './types';
 import { Trophy, Skull, Play, Info, AlertTriangle, RefreshCcw } from 'lucide-react';
 import { soundEngine } from './utils/sound';
+import { ROSTER } from './constants';
 
 const App: React.FC = () => {
   const { 
@@ -167,7 +168,7 @@ const App: React.FC = () => {
           <div className="absolute bottom-[-10%] w-full h-[60%] bg-[linear-gradient(rgba(0,255,100,0.1)_1px,transparent_1px),linear-gradient(90deg,rgba(0,255,100,0.1)_1px,transparent_1px)] bg-[size:50px_50px] [transform:perspective(600px)_rotateX(60deg)] origin-bottom pointer-events-none z-10 opacity-30"></div>
 
           {/* Opponent Layer */}
-          <div className={`transition-all duration-75 z-20 origin-bottom translate-y-[30%] transform scale-[1.3]`}>
+          <div data-testid="opponent-fighter" className={`transition-all duration-75 z-20 origin-bottom translate-y-[30%] transform scale-[1.3]`}>
              <Opponent state={opponentState} character={currentOpponent} lastHitType={lastHitType} />
           </div>
 
@@ -198,16 +199,37 @@ const App: React.FC = () => {
                     </div>
                 </div>
             </div>
-            <button 
-                onClick={() => {
-                    soundEngine.init(); // Just in case
-                    soundEngine.resume();
-                    resetGame(false);
-                }}
-                className="flex items-center gap-3 px-8 py-4 bg-green-600 hover:bg-green-500 text-white font-retro text-lg rounded shadow-[0_0_25px_rgba(34,197,94,0.6)] transition-all transform hover:scale-110 active:scale-95 mt-4"
-            >
-                <Play size={20} /> ENTER RING
-            </button>
+            <div className="flex flex-col gap-3 items-center">
+              <button 
+                  data-testid="enter-ring-button"
+                  onClick={() => {
+                      soundEngine.init(); // Just in case
+                      soundEngine.resume();
+                      resetGame(false);
+                  }}
+                  className="flex items-center gap-3 px-8 py-4 bg-green-600 hover:bg-green-500 text-white font-retro text-lg rounded shadow-[0_0_25px_rgba(34,197,94,0.6)] transition-all transform hover:scale-110 active:scale-95"
+              >
+                  <Play size={20} /> ENTER RING
+              </button>
+
+              {/* Roster Opponent Selectors */}
+              <div className="flex flex-wrap gap-2 justify-center max-w-md mt-2">
+                {ROSTER.map((opp) => (
+                  <button
+                    key={opp.id}
+                    data-testid={`select-opponent-${opp.id}`}
+                    onClick={() => {
+                      soundEngine.init();
+                      soundEngine.resume();
+                      resetGame(opp.id);
+                    }}
+                    className="px-3 py-1 bg-slate-800 hover:bg-slate-700 text-slate-300 font-retro text-[10px] rounded border border-slate-600 transition-all hover:scale-105"
+                  >
+                    {opp.name}
+                  </button>
+                ))}
+              </div>
+            </div>
         </div>
       )}
 

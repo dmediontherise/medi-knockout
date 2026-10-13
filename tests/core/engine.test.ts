@@ -6,6 +6,8 @@ import {
   OPPONENT_ATTACKS,
   HEARTS,
   STARS,
+  COMBAT,
+  REFEREE,
   ROUNDS,
   ROSTER_SPECS,
 } from '../../src/core/constants';
@@ -107,6 +109,66 @@ describe('R3 player inputs and defense windows', () => {
     expect(state.player.hp).toBeGreaterThan(initialHp - OPPONENT_ATTACKS.JAB.damage); // only chip damage
     expect(state.player.hearts).toBe(initialHearts - HEARTS.DEFEND_BLOCK_PENALTY);
   });
+
+  // Task 002 Requirement 2:
+  // dodge right avoids a hook; duck avoids a hook; block does NOT stop a hook or an uppercut (player hp decreases in both)
+  it('dodge right avoids hook, duck avoids hook, and block does not stop hook or uppercut', () => {
+    // 1. Dodge right avoids hook
+    let stateDodge = createFight('aint_man', 42);
+    stateDodge.opponent.action = 'PUNCH_HOOK_LEFT';
+    stateDodge.opponent.actionDuration = 32;
+    stateDodge.opponent.actionFrame = OPPONENT_ATTACKS.HOOK.activeFrames - 1;
+    stateDodge.player.action = 'DODGE_RIGHT';
+    stateDodge.player.actionDuration = PLAYER_DURATIONS.DODGE;
+    stateDodge.player.actionFrame = PLAYER_DURATIONS.DODGE_INVULN_START;
+
+    const hpBeforeDodge = stateDodge.player.hp;
+    stateDodge = step(stateDodge, {});
+    expect(stateDodge.player.hp).toBe(hpBeforeDodge);
+    expect(stateDodge.events).toContain('DODGE');
+
+    // 2. Duck avoids hook
+    let stateDuck = createFight('aint_man', 42);
+    stateDuck.opponent.action = 'PUNCH_HOOK_RIGHT';
+    stateDuck.opponent.actionDuration = 32;
+    stateDuck.opponent.actionFrame = OPPONENT_ATTACKS.HOOK.activeFrames - 1;
+    stateDuck.player.action = 'DUCK';
+    stateDuck.player.actionDuration = PLAYER_DURATIONS.DUCK;
+    stateDuck.player.actionFrame = PLAYER_DURATIONS.DUCK_INVULN_START;
+
+    const hpBeforeDuck = stateDuck.player.hp;
+    stateDuck = step(stateDuck, {});
+    expect(stateDuck.player.hp).toBe(hpBeforeDuck);
+    expect(stateDuck.events).toContain('DODGE');
+
+    // 3. Block does NOT stop hook
+    let stateBlockHook = createFight('aint_man', 42);
+    stateBlockHook.opponent.action = 'PUNCH_HOOK_LEFT';
+    stateBlockHook.opponent.actionDuration = 32;
+    stateBlockHook.opponent.actionFrame = OPPONENT_ATTACKS.HOOK.activeFrames - 1;
+    stateBlockHook.player.action = 'BLOCK';
+    stateBlockHook.player.actionDuration = 10;
+    stateBlockHook.player.actionFrame = 2;
+
+    const hpBeforeBlockHook = stateBlockHook.player.hp;
+    stateBlockHook = step(stateBlockHook, { block: true });
+    expect(stateBlockHook.player.hp).toBeLessThan(hpBeforeBlockHook);
+    expect(stateBlockHook.player.action).toBe('HIT');
+
+    // 4. Block does NOT stop uppercut
+    let stateBlockUppercut = createFight('aint_man', 42);
+    stateBlockUppercut.opponent.action = 'PUNCH_UPPERCUT_LEFT';
+    stateBlockUppercut.opponent.actionDuration = 40;
+    stateBlockUppercut.opponent.actionFrame = OPPONENT_ATTACKS.UPPERCUT.activeFrames - 1;
+    stateBlockUppercut.player.action = 'BLOCK';
+    stateBlockUppercut.player.actionDuration = 10;
+    stateBlockUppercut.player.actionFrame = 2;
+
+    const hpBeforeBlockUppercut = stateBlockUppercut.player.hp;
+    stateBlockUppercut = step(stateBlockUppercut, { block: true });
+    expect(stateBlockUppercut.player.hp).toBeLessThan(hpBeforeBlockUppercut);
+    expect(stateBlockUppercut.player.action).toBe('HIT');
+  });
 });
 
 describe('R4 hearts and exhaustion', () => {
@@ -145,6 +207,64 @@ describe('R4 hearts and exhaustion', () => {
     const recovered = step(postState, {});
     expect(recovered.player.hearts).toBeGreaterThan(0);
   });
+
+  // Task 002 Requirement 3:
+  // a player punch that lands gives +1 heart; a player punch that is blocked by the opponent's guard gives -1 heart
+  it('landed player punch awards heart bonus and guard-blocked punch imposes heart penalty', () => {
+    // 1. Landing a punch awards +1 heart
+    let stateLand = createFight('aint_man', 1);
+    stateLand.opponent.action = 'IDLE';
+    stateLand.opponent.guard = 'LOW'; // Low guard means head punch lands
+    stateLand.player.hearts = 5;
+
+    stateLand = step(stateLand, { punchLeftHead: true });
+    expect(stateLand.player.hearts).toBe(5 + HEARTS.PUNCH_LANDED_BONUS);
+
+    // 2. Punch blocked by guard gives -1 heart
+    let stateBlocked = createFight('aint_man', 1);
+    stateBlocked.opponent.action = 'IDLE';
+    stateBlocked.opponent.guard = 'HIGH'; // High guard blocks head punch
+    stateBlocked.player.hearts = 5;
+
+    stateBlocked = step(stateBlocked, { punchLeftHead: true });
+    expect(stateBlocked.player.hearts).toBe(5 - HEARTS.BLOCKED_PENALTY);
+  });
+
+  // Task 002 Requirement 10:
+  // an exhausted player who evades enough attacks to reach EXHAUSTION_RECOVERY_THRESHOLD has isExhausted === false afterwards and punch input then produces punch action
+  it('exhausted player recovering to threshold clears exhaustion and re-enables punching', () => {
+    let state = createFight('aint_man', 1);
+    state.player.hearts = 0;
+    state.player.isExhausted = true;
+    state.player.action = 'IDLE';
+
+    // Evade attacks until threshold is reached
+    while (state.player.hearts < HEARTS.EXHAUSTION_RECOVERY_THRESHOLD) {
+      state.player.action = 'DODGE_LEFT';
+      state.player.actionDuration = PLAYER_DURATIONS.DODGE;
+      state.player.actionFrame = PLAYER_DURATIONS.DODGE_INVULN_START;
+
+      state.opponent.action = 'PUNCH_JAB_LEFT';
+      state.opponent.actionDuration = 26;
+      state.opponent.actionFrame = OPPONENT_ATTACKS.JAB.activeFrames - 1;
+
+      state = step(state, {});
+    }
+
+    expect(state.player.isExhausted).toBe(false);
+    expect(state.player.hearts).toBeGreaterThanOrEqual(HEARTS.EXHAUSTION_RECOVERY_THRESHOLD);
+
+    // Fast forward dodge finish to IDLE
+    state.player.action = 'IDLE';
+    state.player.actionFrame = 0;
+    state.player.actionDuration = 0;
+    state.opponent.action = 'IDLE';
+    state.opponent.guard = 'LOW';
+
+    // Player punching should now be accepted
+    state = step(state, { punchLeftHead: true });
+    expect(state.player.action).toBe('PUNCH_LEFT_HEAD');
+  });
 });
 
 describe('R5 stars and star punch', () => {
@@ -177,11 +297,24 @@ describe('R5 stars and star punch', () => {
     state = step(state, {});
     expect(state.player.stars).toBe(0);
   });
+
+  // Task 002 Requirement 11:
+  // with 3 stars, landing another punch in a star-opportunity window leaves stars === 3
+  it('caps player stars at 3 even during star opportunity', () => {
+    let state = createFight('aint_man', 1);
+    state.player.stars = STARS.MAX_STARS;
+    state.opponent.action = 'IDLE';
+    state.opponent.guard = 'LOW';
+    state.opponent.starOpportunity = true;
+
+    state = step(state, { punchLeftHead: true });
+    expect(state.player.stars).toBe(STARS.MAX_STARS);
+  });
 });
 
 describe('R6 opponent tells', () => {
   it('every opponent tell is at least 12 frames and scales with rounds', () => {
-    for (const [id, spec] of Object.entries(ROSTER_SPECS)) {
+    for (const [, spec] of Object.entries(ROSTER_SPECS)) {
       for (const atk of ['JAB', 'HOOK', 'UPPERCUT'] as const) {
         expect(spec.baseTells[atk]).toBeGreaterThanOrEqual(12);
       }
@@ -196,6 +329,48 @@ describe('R6 opponent tells', () => {
         break;
       }
     }
+  });
+
+  // Task 002 Requirement 4:
+  // for one roster opponent, the tell length observed at round 3 is strictly shorter than at round 1 and never below 12;
+  // two createFight runs with the same seed and empty inputs reach the same opponent action sequence over 600 frames
+  it('tell length at round 3 is strictly shorter than at round 1 and reaches same sequence for same seed over 600 frames', () => {
+    // 1. Tell length round 3 vs round 1
+    const runUntilTell = (round: number): number => {
+      let state = createFight('aint_man', 123);
+      state.round = round;
+      for (let i = 0; i < 200; i++) {
+        state = step(state, {});
+        if (state.opponent.action.startsWith('TELL_')) {
+          return state.opponent.actionDuration;
+        }
+      }
+      return -1;
+    };
+
+    const r1Tell = runUntilTell(1);
+    const r3Tell = runUntilTell(3);
+    expect(r1Tell).toBeGreaterThan(0);
+    expect(r3Tell).toBeGreaterThan(0);
+    expect(r3Tell).toBeLessThan(r1Tell);
+    expect(r3Tell).toBeGreaterThanOrEqual(12);
+
+    // 2. Deterministic action sequence over 600 frames
+    const seed = 54321;
+    let s1 = createFight('aint_man', seed);
+    let s2 = createFight('aint_man', seed);
+
+    const actions1: string[] = [];
+    const actions2: string[] = [];
+
+    for (let f = 0; f < 600; f++) {
+      s1 = step(s1, {});
+      s2 = step(s2, {});
+      actions1.push(s1.opponent.action);
+      actions2.push(s2.opponent.action);
+    }
+
+    expect(actions1).toEqual(actions2);
   });
 });
 
@@ -212,6 +387,78 @@ describe('R7 counters and guard blocking', () => {
     expect(state.events).toContain('COUNTER');
     expect(state.opponent.action).toBe('STUNNED');
     expect(state.opponent.hp).toBeLessThan(oppHp);
+  });
+
+  // Task 002 Requirement 5:
+  // a head punch into an idle HIGH guard and a body punch into an idle LOW guard are each blocked
+  // (player.hearts drops by 1, no opponent hp loss); the opposite pairings land.
+  it('guard blocks matching punches and opposite pairings land', () => {
+    // 1. Head punch into idle HIGH guard is blocked
+    let sHighBlocked = createFight('aint_man', 1);
+    sHighBlocked.opponent.action = 'IDLE';
+    sHighBlocked.opponent.guard = 'HIGH';
+    const oppHp1 = sHighBlocked.opponent.hp;
+    const playerHearts1 = sHighBlocked.player.hearts;
+
+    sHighBlocked = step(sHighBlocked, { punchLeftHead: true });
+    expect(sHighBlocked.player.hearts).toBe(playerHearts1 - HEARTS.BLOCKED_PENALTY);
+    expect(sHighBlocked.opponent.hp).toBe(oppHp1);
+    expect(sHighBlocked.events).toContain('HIT_BLOCK');
+
+    // 2. Body punch into idle LOW guard is blocked
+    let sLowBlocked = createFight('aint_man', 1);
+    sLowBlocked.opponent.action = 'IDLE';
+    sLowBlocked.opponent.guard = 'LOW';
+    const oppHp2 = sLowBlocked.opponent.hp;
+    const playerHearts2 = sLowBlocked.player.hearts;
+
+    sLowBlocked = step(sLowBlocked, { punchLeftBody: true });
+    expect(sLowBlocked.player.hearts).toBe(playerHearts2 - HEARTS.BLOCKED_PENALTY);
+    expect(sLowBlocked.opponent.hp).toBe(oppHp2);
+    expect(sLowBlocked.events).toContain('HIT_BLOCK');
+
+    // 3. Head punch into idle LOW guard lands
+    let sHighLand = createFight('aint_man', 1);
+    sHighLand.opponent.action = 'IDLE';
+    sHighLand.opponent.guard = 'LOW';
+    const oppHp3 = sHighLand.opponent.hp;
+
+    sHighLand = step(sHighLand, { punchLeftHead: true });
+    expect(sHighLand.opponent.hp).toBeLessThan(oppHp3);
+    expect(sHighLand.events).toContain('HIT_HEAD');
+
+    // 4. Body punch into idle HIGH guard lands
+    let sLowLand = createFight('aint_man', 1);
+    sLowLand.opponent.action = 'IDLE';
+    sLowLand.opponent.guard = 'HIGH';
+    const oppHp4 = sLowLand.opponent.hp;
+
+    sLowLand = step(sLowLand, { punchLeftBody: true });
+    expect(sLowLand.opponent.hp).toBeLessThan(oppHp4);
+    expect(sLowLand.events).toContain('HIT_BODY');
+  });
+
+  // Task 002 Requirement 11:
+  // a counter punch deals exactly COUNTER_MULTIPLIER times the damage of the same punch landed outside a counter window
+  it('counter punch deals exactly COUNTER_MULTIPLIER times regular punch damage', () => {
+    // Normal landed head punch
+    let normalState = createFight('aint_man', 1);
+    normalState.opponent.action = 'IDLE';
+    normalState.opponent.guard = 'LOW';
+    const normalHpBefore = normalState.opponent.hp;
+    normalState = step(normalState, { punchLeftHead: true });
+    const normalDamage = normalHpBefore - normalState.opponent.hp;
+
+    // Counter head punch during tell
+    let counterState = createFight('aint_man', 1);
+    counterState.opponent.action = 'TELL_JAB_LEFT';
+    counterState.opponent.actionDuration = 24;
+    counterState.opponent.actionFrame = 5;
+    const counterHpBefore = counterState.opponent.hp;
+    counterState = step(counterState, { punchLeftHead: true });
+    const counterDamage = counterHpBefore - counterState.opponent.hp;
+
+    expect(counterDamage).toBe(Math.floor(normalDamage * COMBAT.COUNTER_MULTIPLIER));
   });
 });
 
@@ -239,6 +486,55 @@ describe('R8 knockdowns and counts', () => {
     expect(state.result).toBe('TKO');
     expect(state.winner).toBe('PLAYER');
   });
+
+  // Task 002 Requirement 6:
+  // player at 0 hp goes down, gets up when mash inputs reach the constant threshold before count 10,
+  // and is KO'd (result === 'KO', winner === 'OPPONENT') when they do not;
+  // referee count advances 1 per constant N frames
+  it('player knockdown, mash get-up before count 10, KO when no mash, and referee count cadence', () => {
+    // 1. Referee count advances 1 per REFEREE.FRAMES_PER_COUNT frames
+    let sCount = createFight('aint_man', 1);
+    sCount.player.hp = 0;
+    sCount.phase = 'KNOCKDOWN_COUNT';
+    sCount.referee.count = 0;
+    sCount.referee.countFrameCounter = 0;
+    sCount.referee.downFighter = 'PLAYER';
+
+    for (let f = 0; f < REFEREE.FRAMES_PER_COUNT; f++) {
+      sCount = step(sCount, {});
+    }
+    expect(sCount.referee.count).toBe(1);
+
+    // 2. Player gets up when mash inputs reach threshold
+    let sMash = createFight('aint_man', 1);
+    sMash.player.hp = 0;
+    sMash.phase = 'KNOCKDOWN_COUNT';
+    sMash.referee.count = 2;
+    sMash.referee.downFighter = 'PLAYER';
+    sMash.referee.playerMashCount = 0;
+    sMash.referee.targetGetUpCount = REFEREE.MASHES_NEEDED_BASE;
+
+    for (let m = 0; m < REFEREE.MASHES_NEEDED_BASE; m++) {
+      sMash = step(sMash, { mash: true });
+    }
+    expect(sMash.phase).toBe('ROUND_ACTIVE');
+    expect(sMash.player.action).toBe('IDLE');
+    expect(sMash.player.hp).toBeGreaterThan(0);
+
+    // 3. Player is KO'd when mash does not happen and count hits 10
+    let sKo = createFight('aint_man', 1);
+    sKo.player.hp = 0;
+    sKo.phase = 'KNOCKDOWN_COUNT';
+    sKo.referee.count = 9;
+    sKo.referee.countFrameCounter = REFEREE.FRAMES_PER_COUNT - 1;
+    sKo.referee.downFighter = 'PLAYER';
+
+    sKo = step(sKo, {});
+    expect(sKo.referee.count).toBe(REFEREE.MAX_COUNT);
+    expect(sKo.phase).toBe('MATCH_OVER');
+    expect(sKo.result).toBe('KO');
+    expect(sKo.winner).toBe('OPPONENT');
+  });
 });
 
 describe('R9 rounds and decisions', () => {
@@ -256,6 +552,49 @@ describe('R9 rounds and decisions', () => {
     }
     expect(state.round).toBe(2);
     expect(state.phase).toBe('ROUND_ACTIVE');
+  });
+
+  // Task 002 Requirement 7:
+  // after round 1 ends player's hp rises and hearts reset to opponent's starting count;
+  // after round 3 with no KO result === 'DECISION' and winner follows points table (one case player ahead, one opponent ahead)
+  it('between rounds heals HP and resets hearts, decision winner follows points table', () => {
+    // 1. Between rounds heal and hearts reset
+    let sHeal = createFight('aint_man', 1);
+    const initialHearts = ROSTER_SPECS.aint_man.initialHearts;
+    sHeal.player.hp = 20;
+    sHeal.player.hearts = 1;
+    sHeal.phase = 'BETWEEN_ROUNDS';
+    sHeal.roundFrame = ROUNDS.BETWEEN_ROUND_FRAMES - 1;
+
+    sHeal = step(sHeal, {});
+    expect(sHeal.round).toBe(2);
+    expect(sHeal.phase).toBe('ROUND_ACTIVE');
+    expect(sHeal.player.hp).toBe(20 + Math.floor(sHeal.player.maxHp * ROUNDS.BETWEEN_ROUND_HEAL_RATIO));
+    expect(sHeal.player.hearts).toBe(initialHearts);
+
+    // 2. Decision with player points ahead
+    let sDecWin = createFight('aint_man', 1);
+    sDecWin.round = 3;
+    sDecWin.gameClockSeconds = 1;
+    sDecWin.roundFrame = 59;
+    sDecWin.player.points = 2000; // Above benchmark (1200)
+
+    sDecWin = step(sDecWin, {});
+    expect(sDecWin.phase).toBe('MATCH_OVER');
+    expect(sDecWin.result).toBe('DECISION');
+    expect(sDecWin.winner).toBe('PLAYER');
+
+    // 3. Decision with opponent ahead / player points below benchmark
+    let sDecLoss = createFight('aint_man', 1);
+    sDecLoss.round = 3;
+    sDecLoss.gameClockSeconds = 1;
+    sDecLoss.roundFrame = 59;
+    sDecLoss.player.points = 100; // Below benchmark (1200)
+
+    sDecLoss = step(sDecLoss, {});
+    expect(sDecLoss.phase).toBe('MATCH_OVER');
+    expect(sDecLoss.result).toBe('DECISION');
+    expect(sDecLoss.winner).toBe('OPPONENT');
   });
 });
 
@@ -299,5 +638,44 @@ describe('R10 characters and specials preserved', () => {
 
     // 5. Aint Man Bountygate combo exists in combos
     expect(ROSTER_SPECS.aint_man.combos.some(c => c.length === 3 && c[0] === 'JAB_LEFT' && c[1] === 'HOOK_RIGHT')).toBe(true);
+  });
+
+  // Task 002 Requirement 8:
+  // with createFight('aint_man', seed) and no forced state, stepping with empty input for up to 3000 frames
+  // across several seeds produces at least one SPECIAL_ACTIVATED event with feedback BOUNTYGATE! and
+  // an opponent attack sequence JAB, HOOK, UPPERCUT
+  it('aint_man naturally triggers BOUNTYGATE special with JAB, HOOK, UPPERCUT combo within 3000 frames', () => {
+    let triggered = false;
+    const seeds = [1, 2, 3, 4, 42, 99, 123];
+
+    for (const seed of seeds) {
+      let state = createFight('aint_man', seed);
+      for (let f = 0; f < 3000; f++) {
+        state = step(state, {});
+        if (state.events.includes('SPECIAL_ACTIVATED') && state.feedbackMessage === 'BOUNTYGATE!') {
+          // The current action is TELL_JAB_LEFT, and the remaining queue is HOOK_RIGHT, UPPERCUT_LEFT
+          expect(state.opponent.action).toBe('TELL_JAB_LEFT');
+          expect(state.opponent.aiQueue).toEqual(['HOOK_RIGHT', 'UPPERCUT_LEFT']);
+
+          // Advance through the attacks and record the sequence of executed moves
+          const attackSequence: string[] = ['JAB'];
+          for (let stepCount = 0; stepCount < 200; stepCount++) {
+            state = step(state, {});
+            if (state.opponent.action === 'TELL_HOOK_RIGHT' && attackSequence.length === 1) {
+              attackSequence.push('HOOK');
+            } else if (state.opponent.action === 'TELL_UPPERCUT_LEFT' && attackSequence.length === 2) {
+              attackSequence.push('UPPERCUT');
+              break;
+            }
+          }
+          expect(attackSequence).toEqual(['JAB', 'HOOK', 'UPPERCUT']);
+          triggered = true;
+          break;
+        }
+      }
+      if (triggered) break;
+    }
+
+    expect(triggered).toBe(true);
   });
 });

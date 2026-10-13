@@ -165,13 +165,20 @@ export const useGameLoop = () => {
     }
   };
 
-  const resetGame = (nextOpponent = false) => {
+  const resetGame = (nextOpponent: boolean | number | string = false) => {
     soundEngine.init();
     soundEngine.resume();
     soundEngine.stopMenuTheme();
 
     let nextIndex = opponentIndex;
-    if (nextOpponent) {
+    if (typeof nextOpponent === 'string') {
+      const foundIdx = ROSTER.findIndex((r) => r.id === nextOpponent);
+      nextIndex = foundIdx !== -1 ? foundIdx : 0;
+      setOpponentIndex(nextIndex);
+    } else if (typeof nextOpponent === 'number') {
+      nextIndex = nextOpponent % ROSTER.length;
+      setOpponentIndex(nextIndex);
+    } else if (nextOpponent) {
       nextIndex = (opponentIndex + 1) % ROSTER.length;
       setOpponentIndex(nextIndex);
     } else {
@@ -255,10 +262,13 @@ export const useGameLoop = () => {
       const delta = Math.min(250, timestamp - lastTimeRef.current);
       lastTimeRef.current = timestamp;
       accumulatorRef.current += delta;
+      const MAX_STEPS = 5;
+      let stepsTaken = 0;
 
-      // Handle transitions in frame time
-      while (accumulatorRef.current >= FRAME_MS) {
+      // Handle transitions in frame time (at most MAX_STEPS iterations per tick)
+      while (accumulatorRef.current >= FRAME_MS && stepsTaken < MAX_STEPS) {
         accumulatorRef.current -= FRAME_MS;
+        stepsTaken++;
 
         // Feedback timer
         if (feedbackTimerRef.current > 0) {
@@ -327,6 +337,11 @@ export const useGameLoop = () => {
             }
           }
         }
+      }
+
+      // Leftover accumulator beyond 5 steps is discarded, not carried forward
+      if (accumulatorRef.current >= FRAME_MS) {
+        accumulatorRef.current = accumulatorRef.current % FRAME_MS;
       }
 
       setRenderTrigger((v) => v + 1);
