@@ -64,6 +64,16 @@ const Player: React.FC<PlayerProps> = ({ state }) => {
       hp.cx += 15;
       twist = 10;
     }
+    else if (state === PlayerAction.DUCK) {
+      lh = { x: 55, y: 80 }; rh = { x: 95, y: 80 };
+      le = { x: 25, y: 110 }; re = { x: 125, y: 110 };
+      hp.cy = 80;
+    }
+    else if (state === PlayerAction.STAR_PUNCH) {
+      rh = { x: 75, y: -160 }; // Maximum height uppercut
+      re = { x: 115, y: -40 };
+      twist = -12;
+    }
     else if (state === PlayerAction.KO) {
       // Slumped over
       lh = { x: 30, y: 120 }; // Hands dropped
@@ -82,11 +92,13 @@ const Player: React.FC<PlayerProps> = ({ state }) => {
     switch (state) {
         case PlayerAction.DODGE_LEFT: return "translate-x-[-40px] rotate-[-10deg]";
         case PlayerAction.DODGE_RIGHT: return "translate-x-[40px] rotate-[10deg]";
+        case PlayerAction.DUCK: return "translate-y-[40px] scale-90";
         case PlayerAction.BLOCK: return "scale-95 translate-y-[5px]";
         case PlayerAction.PUNCH_LEFT_BODY: 
         case PlayerAction.PUNCH_LEFT_HEAD: return "translate-x-[10px]";
         case PlayerAction.PUNCH_RIGHT_BODY: 
         case PlayerAction.PUNCH_RIGHT_HEAD: return "translate-x-[-10px]";
+        case PlayerAction.STAR_PUNCH: return "translate-y-[-20px] scale-110";
         case PlayerAction.HIT: return "translate-x-[-5px] opacity-60";
         case PlayerAction.KO: return "translate-y-[200px] rotate-[45deg] opacity-0 transition-all duration-[2000ms] ease-in";
         default: return "";

@@ -7,6 +7,10 @@ export class SoundEngine {
   private menuThemeOscillator: OscillatorNode | null = null;
   private menuThemeGain: GainNode | null = null;
 
+  isInitialized(): boolean {
+    return this.initialized;
+  }
+
   init() {
     if (this.initialized) return;
     
@@ -28,7 +32,7 @@ export class SoundEngine {
 
   async resume() { // Made async
     if (this.ctx) {
-      const state = this.ctx.state;
+      const state = this.ctx.state as string;
       console.log(`AudioContext state before resume: ${state}`);
       
       if (state === 'suspended' || state === 'interrupted') {
@@ -242,6 +246,32 @@ export class SoundEngine {
       this.playTone(600, 'sawtooth', 0.1, 0);
       this.playTone(800, 'square', 0.4, 0);
       this.playNoise(0.5, 2000, 0.2); 
+  }
+
+  playStarPunch() {
+      this.playTone(587.33, 'triangle', 0.1, 0, 0.2);
+      this.playTone(880.00, 'sawtooth', 0.3, 0.08, 0.3);
+      this.playNoise(0.3, 2500, 0.25);
+  }
+
+  playStarEarned() {
+      this.playTone(987.77, 'square', 0.08, 0, 0.15);
+      this.playTone(1318.51, 'square', 0.2, 0.08, 0.2);
+  }
+
+  playBell() {
+      this.playTone(1200, 'sine', 0.6, 0, 0.3);
+      this.playTone(1205, 'sine', 0.6, 0, 0.2);
+  }
+
+  playCount(count: number) {
+      this.speak(`${count}`, 1.0, 1.2);
+      this.playTone(250, 'square', 0.15, 0, 0.15);
+  }
+
+  playExhausted() {
+      this.playTone(180, 'sawtooth', 0.2, 0, 0.1);
+      this.playTone(120, 'sawtooth', 0.3, 0.15, 0.1);
   }
 
   playStart() {

@@ -17,9 +17,13 @@ const Controls: React.FC<ControlsProps> = ({ onAction, onReleaseBlock }) => {
     const isDown = keys.has('ArrowDown') || keys.has('s');
     const isLeft = keys.has('ArrowLeft') || keys.has('a');
     const isRight = keys.has('ArrowRight') || keys.has('d');
+    const isDuck = keys.has('c') || keys.has('Control') || keys.has('Duck');
+    const isStar = keys.has(' ') || keys.has('Enter') || keys.has('Star');
     const isPunchLeft = keys.has('z') || keys.has('j');
     const isPunchRight = keys.has('x') || keys.has('k');
 
+    if (isStar) return PlayerAction.STAR_PUNCH;
+    if (isDuck) return PlayerAction.DUCK;
     if (isDown) return PlayerAction.BLOCK;
     if (isLeft) return PlayerAction.DODGE_LEFT;
     if (isRight) return PlayerAction.DODGE_RIGHT;
@@ -114,16 +118,24 @@ const Controls: React.FC<ControlsProps> = ({ onAction, onReleaseBlock }) => {
                 </button>
             </div>
 
-            {/* MIDDLE: SELECT/START (Visual Only for now) */}
-            <div className="hidden md:flex gap-4 mt-12">
-                <div className="flex flex-col items-center gap-1">
-                    <div className="w-12 h-4 bg-slate-400 rounded-full border-2 border-slate-500 transform rotate-12"></div>
-                    <span className="text-[8px] font-bold text-slate-500 uppercase tracking-widest">Select</span>
-                </div>
-                <div className="flex flex-col items-center gap-1">
-                    <div className="w-12 h-4 bg-slate-400 rounded-full border-2 border-slate-500 transform rotate-12"></div>
-                    <span className="text-[8px] font-bold text-slate-500 uppercase tracking-widest">Start</span>
-                </div>
+            {/* MIDDLE: SELECT (DUCK) / START (STAR PUNCH) */}
+            <div className="flex gap-4 mt-8 md:mt-12">
+                <button 
+                    className="flex flex-col items-center gap-1 active:opacity-75 focus:outline-none"
+                    onTouchStart={(e) => { e.preventDefault(); onAction(PlayerAction.DUCK); }}
+                    onClick={() => onAction(PlayerAction.DUCK)}
+                >
+                    <div className="w-10 h-3 md:w-12 md:h-4 bg-slate-400 rounded-full border-2 border-slate-500 transform rotate-12 active:bg-slate-300"></div>
+                    <span className="text-[8px] font-bold text-slate-500 uppercase tracking-widest">Duck</span>
+                </button>
+                <button 
+                    className="flex flex-col items-center gap-1 active:opacity-75 focus:outline-none"
+                    onTouchStart={(e) => { e.preventDefault(); onAction(PlayerAction.STAR_PUNCH); }}
+                    onClick={() => onAction(PlayerAction.STAR_PUNCH)}
+                >
+                    <div className="w-10 h-3 md:w-12 md:h-4 bg-yellow-500 rounded-full border-2 border-yellow-600 transform rotate-12 active:bg-yellow-400"></div>
+                    <span className="text-[8px] font-bold text-yellow-600 uppercase tracking-widest">Star</span>
+                </button>
             </div>
 
             {/* RIGHT SIDE: ACTION BUTTONS (B/A Style) */}

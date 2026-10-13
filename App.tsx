@@ -20,6 +20,7 @@ const App: React.FC = () => {
     feedbackMessage,
     currentOpponent,
     activeSpecial,
+    fightState,
     handlePlayerInput,
     releaseBlock,
     resetGame
@@ -28,7 +29,7 @@ const App: React.FC = () => {
   // Ensure AudioContext is unlocked on first interaction
   React.useEffect(() => {
       const unlockAudio = async () => { // Made async
-          if (!soundEngine.initialized) {
+          if (!soundEngine.isInitialized()) {
             soundEngine.init();
             await soundEngine.resume(); // Await the resume
           }
@@ -104,19 +105,27 @@ const App: React.FC = () => {
                style={{ width: `${playerHealthPercent}%` }}
              ></div>
           </div>
-          <div className="flex items-center gap-2 mt-1">
-             <span className="text-blue-300 text-[8px]">STM</span>
-             <div className="h-2 md:h-3 w-24 bg-slate-800 border border-slate-600">
-                <div 
-                    className="h-full bg-blue-400 transition-all duration-100" 
-                    style={{ width: `${staminaPercent}%` }}
-                ></div>
+          <div className="flex items-center gap-3 mt-1">
+             <div className="flex items-center gap-1">
+                <span className="text-red-400 text-[10px]">♥</span>
+                <span className="text-white text-[10px] font-bold">{fightState.player.hearts}</span>
              </div>
+             <div className="flex items-center gap-0.5">
+                {[...Array(3)].map((_, i) => (
+                  <span key={i} className={`text-xs ${i < fightState.player.stars ? 'text-yellow-400' : 'text-slate-600'}`}>★</span>
+                ))}
+             </div>
+             {fightState.player.isExhausted && (
+                <span className="text-pink-500 text-[8px] animate-pulse font-bold">TIRED!</span>
+             )}
           </div>
         </div>
 
         {/* Timer / Feedback */}
-        <div className="text-center w-[20%] mt-4 pointer-events-none z-50 flex justify-center">
+        <div className="text-center w-[20%] flex flex-col items-center pointer-events-none z-50">
+            <div className="text-slate-300 font-retro text-xs md:text-sm bg-slate-900/80 px-2 py-0.5 border border-slate-700 rounded">
+                R{fightState.round} {Math.floor(fightState.gameClockSeconds / 60)}:{String(fightState.gameClockSeconds % 60).padStart(2, '0')}
+            </div>
             {feedbackMessage && (
                 <div className="absolute top-16 text-yellow-400 text-2xl md:text-5xl animate-bounce font-bold drop-shadow-[0_4px_0_rgba(0,0,0,1)] stroke-black tracking-tighter whitespace-nowrap">
                     {feedbackMessage}
