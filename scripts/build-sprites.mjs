@@ -384,16 +384,42 @@ async function buildAllSprites() {
     }
 
     if (usesLie) {
-      // AINT MAN LIE: rotate idle frame 0 by 90 deg counter-clockwise
-      const b = boxes[0];
-      const srcW = b[2] - b[0] + 1;
-      const srcH = b[3] - b[1] + 1;
-      const targetW = Math.round(srcW * factor);
-      const targetH = Math.round(srcH * factor);
-      const box = { x: b[0], y: b[1], w: srcW, h: srcH };
+      // AINT MAN LIE: rotate idle figure 0 by 90 deg counter-clockwise (lossless transpose),
+      // then scale down with nearest-neighbour so height <= 86 px and width 105-125 px.
+      const idle = sprites['FIG_0'];
+      const transW = idle.height; // 140
+      const transH = idle.width;  // 107
+      const transRows = [];
+      for (let y = 0; y < transH; y++) {
+        let r = '';
+        for (let x = 0; x < transW; x++) {
+          const sx = (idle.width - 1) - y;
+          const sy = x;
+          r += idle.rows[sy][sx];
+        }
+        transRows.push(r);
+      }
 
-      const sprite = await processSpriteImage(img, box, targetW, targetH, opp.id, true, charPalette);
-      sprites['LIE'] = sprite;
+      // Nearest-neighbour scale down to width: 112, height: 85
+      const lieW = 112;
+      const lieH = 85;
+      const lieRows = [];
+      for (let y = 0; y < lieH; y++) {
+        const sy = Math.floor(y * transH / lieH);
+        let r = '';
+        for (let x = 0; x < lieW; x++) {
+          const sx = Math.floor(x * transW / lieW);
+          r += transRows[sy][sx];
+        }
+        lieRows.push(r);
+      }
+
+      sprites['LIE'] = {
+        width: lieW,
+        height: lieH,
+        palette: idle.palette,
+        rows: lieRows,
+      };
     }
 
     spriteMapConfig[opp.id] = {

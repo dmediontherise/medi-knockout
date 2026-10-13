@@ -320,11 +320,10 @@ test.describe('Pose Preview and Contact Sheets Suite', () => {
       expect(nonBgCount, `${oppId} KO frame 30 has opponent`).toBeGreaterThan(100);
       const hSpan = maxX - minX + 1;
       const vSpan = maxY - minY + 1;
-      expect(hSpan, `${oppId} KO frame 30 horizontal span >= 100 px`).toBeGreaterThanOrEqual(100);
-      if (oppId === 'medi_jinx' || oppId === 'maga_man') {
-        expect(vSpan, `${oppId} KO frame 30 vertical span <= 90 px`).toBeLessThanOrEqual(90);
-      }
+      expect(hSpan, `${oppId} KO frame 30 horizontal span >= 90 px`).toBeGreaterThanOrEqual(90);
+      expect(vSpan, `${oppId} KO frame 30 vertical span <= 100 px`).toBeLessThanOrEqual(100);
       expect(maxY, `${oppId} KO frame 30 bottom row <= 192`).toBeLessThanOrEqual(192);
+      expect(hSpan, `${oppId} KO frame 30 horizontal span > vertical span`).toBeGreaterThan(vSpan);
     });
   }
 });

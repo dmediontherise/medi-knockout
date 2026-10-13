@@ -32,7 +32,7 @@ import {
 } from '../../src/render/screens/presentationData';
 import { drawBitmapText, FONT_8X8 } from '../../src/render/sprites/font';
 import { createFight } from '../../src/core/engine';
-import { IDLE_BASE_AINT_MAN } from '../../src/render/sprites/generated/aint_man';
+import { IDLE_BASE_AINT_MAN, AINT_MAN_LIE } from '../../src/render/sprites/generated/aint_man';
 import { IDLE_BASE_MEDI_JINX } from '../../src/render/sprites/generated/medi_jinx';
 import { IDLE_BASE_DJ_TITO } from '../../src/render/sprites/generated/dj_tito';
 import { SPARK_SPRITE, STAR_SPRITE } from '../../src/render/sprites/effects';
@@ -1062,13 +1062,10 @@ describe('Task 012: Real animation frames from sheets', () => {
 
       for (const [key, sprite] of Object.entries(frameMap)) {
         if (key === 'LIE') {
-          // Aint Man LIE is rotated 90 deg CCW from idle figure 0
-          const idleSrcW = figureBoxes[0][2] - figureBoxes[0][0] + 1;
-          const expectedHeight = Math.round(idleSrcW * factor);
-          expect(
-            Math.abs(sprite.height - expectedHeight),
-            `Character ${id} LIE height ${sprite.height} should be within ±2 px of round(${idleSrcW} * ${factor}) = ${expectedHeight}`
-          ).toBeLessThanOrEqual(2);
+          // Per Task 013 Requirement 2: Aint Man LIE is scaled down so height <= 86 px and width 105-125 px
+          expect(sprite.height, `Character ${id} LIE height <= 86 px`).toBeLessThanOrEqual(86);
+          expect(sprite.width, `Character ${id} LIE width >= 105 px`).toBeGreaterThanOrEqual(105);
+          expect(sprite.width, `Character ${id} LIE width <= 125 px`).toBeLessThanOrEqual(125);
         } else {
           const figIdx = parseInt(key, 10);
           const box = figureBoxes[figIdx];
@@ -1246,22 +1243,64 @@ describe('Task 012: Real animation frames from sheets', () => {
     }
   });
 
-  // Requirement 6: Knockdown at actionFrame 30
-  it('Requirement 6: at actionFrame 30, opponent opaque pixels span >= 100 px horizontally, <= 90 px vertically for sheet lying frames, every row <= 192, and drawn count equals lying sprite opaque count', () => {
-    function createMockCanvas(): { ctx: CanvasRenderingContext2D; buffer: Uint8ClampedArray } {
-      const buffer = new Uint8ClampedArray(CANVAS_WIDTH * CANVAS_HEIGHT * 4);
-      const ctx = {
-        createImageData: (w: number, h: number) => ({ width: w, height: h, data: buffer }),
-        putImageData: (imgData: any) => { buffer.set(imgData.data); },
-      } as unknown as CanvasRenderingContext2D;
-      return { ctx, buffer };
+  // Task 013 Requirement 1 & 2: AINT MAN LIE direction and size
+  it('Requirement 1 & 2: AINT MAN LIE is rotated 90 deg CCW (structural transpose), left 25% holds former top rows, height <= 86 px, width 105-125 px', () => {
+    // Height <= 86 px and width 105-125 px
+    expect(AINT_MAN_LIE.height, 'AINT_MAN_LIE height <= 86 px').toBeLessThanOrEqual(86);
+    expect(AINT_MAN_LIE.width, 'AINT_MAN_LIE width >= 105 px').toBeGreaterThanOrEqual(105);
+    expect(AINT_MAN_LIE.width, 'AINT_MAN_LIE width <= 125 px').toBeLessThanOrEqual(125);
+
+    // 1. Structural transpose test:
+    // Take idle figure 0 and rotate it 90 deg CCW: top row becomes left column
+    const idle = IDLE_BASE_AINT_MAN;
+    const transW = idle.height; // 140
+    const transH = idle.width;  // 107
+    const transRows: string[] = [];
+    for (let y = 0; y < transH; y++) {
+      let r = '';
+      for (let x = 0; x < transW; x++) {
+        const sx = (idle.width - 1) - y;
+        const sy = x;
+        r += idle.rows[sy][sx];
+      }
+      transRows.push(r);
     }
 
+    // Nearest-neighbour scale it to the LIE frame's width and height
+    const lieW = AINT_MAN_LIE.width;
+    const lieH = AINT_MAN_LIE.height;
+    const scaledRows: string[] = [];
+    for (let y = 0; y < lieH; y++) {
+      const sy = Math.floor(y * transH / lieH);
+      let r = '';
+      for (let x = 0; x < lieW; x++) {
+        const sx = Math.floor(x * transW / lieW);
+        r += transRows[sy][sx];
+      }
+      scaledRows.push(r);
+    }
+
+    // Assert it equals the LIE rows exactly
+    expect(AINT_MAN_LIE.rows, 'AINT_MAN_LIE matches 90 deg CCW nearest-neighbour scale of idle figure 0').toEqual(scaledRows);
+
+    // 2. Left 25% of LIE columns holds the sprite's former top rows (the helmet):
+    // The opaque pixels of idle rows 0-20 all land in LIE columns < 25% of its width
+    const left25Col = Math.floor(lieW * 0.25);
+    for (let lieX = 0; lieX < lieW; lieX++) {
+      const sx = Math.floor(lieX * transW / lieW);
+      if (sx <= 20) {
+        expect(lieX, `LIE column ${lieX} corresponding to idle row ${sx} is in leftmost 25% (< ${left25Col})`).toBeLessThan(left25Col);
+      }
+    }
+  });
+
+  // Task 013 Requirement 4: Bounds for all five opponents at actionFrame 30
+  it('Requirement 4: at actionFrame 30, every opponent opaque pixels span >= 90 px horizontally, <= 100 px vertically, bottom <= 192, and hSpan > vSpan', () => {
     const OPPONENTS = ['aint_man', 'medi_jinx', 'dj_tito', 'mr_yankee', 'maga_man'];
 
     for (const id of OPPONENTS) {
       const sprite = getOpponentSprite(id, 'KNOCKED_DOWN', 30);
-      const { x, y } = computeOpponentDraw(id, 'KNOCKED_DOWN', 30, 0);
+      const draw = computeOpponentDraw(id, 'KNOCKED_DOWN', 30, 0);
 
       // Measure lying sprite properties directly
       let minX = sprite.width;
@@ -1286,20 +1325,37 @@ describe('Task 012: Real animation frames from sheets', () => {
       const hSpan = maxX - minX + 1;
       const vSpan = maxY - minY + 1;
 
-      expect(hSpan, `${id} horizontal span >= 100 px`).toBeGreaterThanOrEqual(100);
-      // For sheet lying frames that are under 90 px vertically (medi_jinx, maga_man), assert vSpan <= 90 px
-      // (Aint Man rotated idle is 107 px, DJ Tito fig 11 is 95 px, Mr Yankee fig 10 is 93 px)
-      if (id === 'medi_jinx' || id === 'maga_man') {
-        expect(vSpan, `${id} vertical span <= 90 px`).toBeLessThanOrEqual(90);
-      } else {
-        expect(vSpan, `${id} vertical span is reasonably flat (<= 110 px)`).toBeLessThanOrEqual(110);
-      }
+      expect(hSpan, `${id} horizontal span >= 90 px`).toBeGreaterThanOrEqual(90);
+      expect(vSpan, `${id} vertical span <= 100 px`).toBeLessThanOrEqual(100);
 
-      // Assert bottom row lands on or before y = 192
-      const drawnBottomY = y + maxY;
+      // Bottom row lands on or before y = 192
+      const drawnBottomY = draw.y + maxY;
       expect(drawnBottomY, `${id} bottom row <= 192`).toBeLessThanOrEqual(192);
 
-      // Render into canvas and count drawn pixels that match sprite opaque count
+      // Horizontal span > vertical span (lying flat on mat)
+      expect(hSpan, `${id} horizontal span > vertical span`).toBeGreaterThan(vSpan);
+
+      // Center opaque x at 128 ± 4
+      const anchor = getSpriteAnchor(sprite);
+      const centerOpaqueX = draw.x + anchor.centerOpaqueX;
+      expect(Math.abs(centerOpaqueX - 128), `${id} center opaque x at 128 ± 4`).toBeLessThanOrEqual(4);
+    }
+  });
+
+  // Task 013 Requirement 5: Non-tautological clip check (R5 clip)
+  it('Requirement 5: R5 clip: non-tautological clip check verifies lying sprite pixels match canvas diff and fails if bottom 4 rows clipped', () => {
+    function createMockCanvas(): { ctx: CanvasRenderingContext2D; buffer: Uint8ClampedArray } {
+      const buffer = new Uint8ClampedArray(CANVAS_WIDTH * CANVAS_HEIGHT * 4);
+      const ctx = {
+        createImageData: (w: number, h: number) => ({ width: w, height: h, data: buffer }),
+        putImageData: (imgData: any) => { buffer.set(imgData.data); },
+      } as unknown as CanvasRenderingContext2D;
+      return { ctx, buffer };
+    }
+
+    const OPPONENTS = ['aint_man', 'medi_jinx', 'dj_tito', 'mr_yankee', 'maga_man'];
+
+    for (const id of OPPONENTS) {
       const withOpp: any = createFight(id, 1);
       withOpp.phase = 'KNOCKDOWN_COUNT';
       withOpp.referee.downFighter = 'OPPONENT';
@@ -1308,7 +1364,6 @@ describe('Task 012: Real animation frames from sheets', () => {
       withOpp.opponent.starOpportunity = false;
       withOpp.frame = 0;
 
-      // Blank out referee and player
       const withoutOpp: any = {
         ...withOpp,
         opponent: { ...withOpp.opponent, action: 'KO', actionFrame: 35 }, // blink off
@@ -1319,25 +1374,78 @@ describe('Task 012: Real animation frames from sheets', () => {
       const mWithout = createMockCanvas();
       renderFrame(mWithout.ctx, withoutOpp);
 
-      // Count pixels drawn on the canvas that match where the sprite was placed
-      let drawnCount = 0;
-      let maxDrawnY = -1;
+      const sprite = getOpponentSprite(id, 'KNOCKED_DOWN', 30);
+      const { x, y } = computeOpponentDraw(id, 'KNOCKED_DOWN', 30, 0);
+
+      const playerDraw = computePlayerDraw(withOpp);
+      const playerSprite = playerDraw.sprite;
+      const pX = playerDraw.x;
+      const pY = playerDraw.y;
+
+      // Count differing pixels inside the lying sprite's drawn rectangle
+      let differingPixels = 0;
+      for (let py = y; py < y + sprite.height; py++) {
+        for (let px = x; px < x + sprite.width; px++) {
+          const idx = (py * CANVAS_WIDTH + px) * 4;
+          if (
+            mWith.buffer[idx] !== mWithout.buffer[idx] ||
+            mWith.buffer[idx + 1] !== mWithout.buffer[idx + 1] ||
+            mWith.buffer[idx + 2] !== mWithout.buffer[idx + 2]
+          ) {
+            differingPixels++;
+          }
+        }
+      }
+
+      // Count the lying sprite's opaque pixels that are not covered by the player's pixels
+      let expectedUncovered = 0;
       for (let r = 0; r < sprite.height; r++) {
         const py = y + r;
         const rowStr = sprite.rows[r];
         for (let c = 0; c < sprite.width; c++) {
           if (rowStr[c] !== '.' && rowStr[c] !== ' ') {
             const px = x + c;
-            const idx = (py * CANVAS_WIDTH + px) * 4;
-            // The canvas pixel should have been drawn
-            drawnCount++;
-            if (py > maxDrawnY) maxDrawnY = py;
+            const pr = py - pY;
+            const pc = px - pX;
+            const coveredByPlayer =
+              pr >= 0 && pr < playerSprite.height &&
+              pc >= 0 && pc < playerSprite.width &&
+              playerSprite.rows[pr][pc] !== '.' && playerSprite.rows[pr][pc] !== ' ';
+            if (!coveredByPlayer) {
+              const idx = (py * CANVAS_WIDTH + px) * 4;
+              const [sr, sg, sb] = nesToRgba(sprite.palette[rowStr[c]]);
+              const differsFromBg =
+                sr !== mWithout.buffer[idx] ||
+                sg !== mWithout.buffer[idx + 1] ||
+                sb !== mWithout.buffer[idx + 2];
+              if (differsFromBg) {
+                expectedUncovered++;
+              }
+            }
           }
         }
       }
 
-      expect(drawnCount, `${id} drawn pixel count equals lying sprite opaque count`).toBe(opaqueCount);
-      expect(maxDrawnY, `${id} max drawn y is <= 192`).toBeLessThanOrEqual(192);
+      expect(differingPixels, `${id} R5 clip: differing pixels count equals unoccluded lying sprite pixels`).toBe(expectedUncovered);
+      expect(differingPixels, `${id} R5 clip: has substantial drawn pixels`).toBeGreaterThan(1000);
+
+      // Verify that the test would FAIL if the renderer clipped the bottom 4 rows of the opponent sprite
+      let clippedDiffCount = 0;
+      const clipCutoffY = y + sprite.height - 4;
+      for (let py = y; py < y + sprite.height; py++) {
+        if (py >= clipCutoffY) continue; // simulated clipping of bottom 4 rows
+        for (let px = x; px < x + sprite.width; px++) {
+          const idx = (py * CANVAS_WIDTH + px) * 4;
+          if (
+            mWith.buffer[idx] !== mWithout.buffer[idx] ||
+            mWith.buffer[idx + 1] !== mWithout.buffer[idx + 1] ||
+            mWith.buffer[idx + 2] !== mWithout.buffer[idx + 2]
+          ) {
+            clippedDiffCount++;
+          }
+        }
+      }
+      expect(clippedDiffCount, `${id} R5 clip: fails if bottom 4 rows are clipped`).not.toBe(expectedUncovered);
     }
   });
 });
