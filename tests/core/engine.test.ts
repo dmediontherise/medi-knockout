@@ -265,6 +265,18 @@ describe('R4 hearts and exhaustion', () => {
     state = step(state, { punchLeftHead: true });
     expect(state.player.action).toBe('PUNCH_LEFT_HEAD');
   });
+
+  // Task 003 Requirement 14 (M12): hit penalty HEARTS.HIT_PENALTY reduces hearts by 3 when starting > 3
+  it('R4 hit penalty reduces hearts by exactly HEARTS.HIT_PENALTY when starting above 3', () => {
+    let state = createFight('aint_man', 1);
+    state.player.hearts = 8;
+    state.opponent.action = 'PUNCH_JAB_LEFT';
+    state.opponent.actionDuration = 26;
+    state.opponent.actionFrame = OPPONENT_ATTACKS.JAB.activeFrames - 1;
+
+    state = step(state, {});
+    expect(state.player.hearts).toBe(8 - HEARTS.HIT_PENALTY);
+  });
 });
 
 describe('R5 stars and star punch', () => {
@@ -460,6 +472,28 @@ describe('R7 counters and guard blocking', () => {
 
     expect(counterDamage).toBe(Math.floor(normalDamage * COMBAT.COUNTER_MULTIPLIER));
   });
+
+  // Task 003 Requirement 14 (M13): punching a STUNNED opponent branch applies STUNNED_MULTIPLIER
+  it('R7 punching a STUNNED opponent deals extra damage using STUNNED_MULTIPLIER', () => {
+    // Normal head punch
+    let normalState = createFight('aint_man', 1);
+    normalState.opponent.action = 'IDLE';
+    normalState.opponent.guard = 'LOW';
+    const normalHpBefore = normalState.opponent.hp;
+    normalState = step(normalState, { punchLeftHead: true });
+    const normalDamage = normalHpBefore - normalState.opponent.hp;
+
+    // Head punch while opponent is STUNNED
+    let stunnedState = createFight('aint_man', 1);
+    stunnedState.opponent.action = 'STUNNED';
+    stunnedState.opponent.actionDuration = 60;
+    stunnedState.opponent.actionFrame = 10;
+    const stunnedHpBefore = stunnedState.opponent.hp;
+    stunnedState = step(stunnedState, { punchLeftHead: true });
+    const stunnedDamage = stunnedHpBefore - stunnedState.opponent.hp;
+
+    expect(stunnedDamage).toBe(Math.floor(normalDamage * COMBAT.STUNNED_MULTIPLIER));
+  });
 });
 
 describe('R8 knockdowns and counts', () => {
@@ -535,6 +569,24 @@ describe('R8 knockdowns and counts', () => {
     expect(sKo.result).toBe('KO');
     expect(sKo.winner).toBe('OPPONENT');
   });
+
+  // Task 003 Requirement 14 (M11): opponent get-up branch restores opponent from knockdown before count 10
+  it('R8 opponent get-up branch restores opponent to ROUND_ACTIVE with restored HP', () => {
+    let state = createFight('aint_man', 1);
+    state.phase = 'KNOCKDOWN_COUNT';
+    state.referee.downFighter = 'OPPONENT';
+    state.referee.count = 4;
+    state.referee.targetGetUpCount = 5;
+    state.referee.countFrameCounter = REFEREE.FRAMES_PER_COUNT - 1; // 1 frame before next count tick
+    state.opponent.action = 'KNOCKED_DOWN';
+
+    state = step(state, {});
+    expect(state.referee.count).toBe(5);
+    expect(state.phase).toBe('ROUND_ACTIVE');
+    expect(state.opponent.action).toBe('IDLE');
+    expect(state.opponent.hp).toBe(Math.floor(state.opponent.maxHp * 0.4));
+    expect(state.referee.downFighter).toBeNull();
+  });
 });
 
 describe('R9 rounds and decisions', () => {
@@ -595,6 +647,19 @@ describe('R9 rounds and decisions', () => {
     expect(sDecLoss.phase).toBe('MATCH_OVER');
     expect(sDecLoss.result).toBe('DECISION');
     expect(sDecLoss.winner).toBe('OPPONENT');
+  });
+
+  // Task 003 Requirement 14 (M14): between-round transition resets isExhausted to false
+  it('R9 between-round transition resets player isExhausted to false', () => {
+    let state = createFight('aint_man', 1);
+    state.phase = 'BETWEEN_ROUNDS';
+    state.roundFrame = ROUNDS.BETWEEN_ROUND_FRAMES - 1;
+    state.player.isExhausted = true;
+    state.player.hearts = 0;
+
+    state = step(state, {});
+    expect(state.phase).toBe('ROUND_ACTIVE');
+    expect(state.player.isExhausted).toBe(false);
   });
 });
 

@@ -200,8 +200,14 @@ export const useGameLoop = () => {
     setGameState(GameState.ENTRANCE);
     soundEngine.playEntrance(opp.id);
 
-    // Entrance lasts 240 frames (~4.0s)
-    transitionTimerRef.current = 240;
+    // Check if skip_entrance or test flag is present in window.location
+    const isFast = typeof window !== 'undefined' && (
+      window.location.search.includes('skip_entrance') ||
+      window.location.search.includes('test')
+    );
+
+    // Entrance lasts 240 frames (~4.0s), or 1 frame in fast/test mode
+    transitionTimerRef.current = isFast ? 1 : 240;
     nextTransitionStateRef.current = GameState.ROUND_START;
   };
 
@@ -288,9 +294,13 @@ export const useGameLoop = () => {
 
             if (nextState === GameState.ROUND_START) {
               setFeedbackMessage('READY?');
-              feedbackTimerRef.current = 120;
+              const isFast = typeof window !== 'undefined' && (
+                window.location.search.includes('skip_entrance') ||
+                window.location.search.includes('test')
+              );
+              feedbackTimerRef.current = isFast ? 5 : 120;
               soundEngine.playReady();
-              transitionTimerRef.current = 120; // 2 seconds
+              transitionTimerRef.current = isFast ? 5 : 120;
               nextTransitionStateRef.current = GameState.PLAYING;
             } else if (nextState === GameState.PLAYING) {
               setFeedbackMessage('FIGHT!');

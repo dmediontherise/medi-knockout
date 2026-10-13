@@ -19,12 +19,19 @@ for (const opponentId of OPPONENT_IDS) {
     await opponentButton.click();
 
     // Wait until fight is in progress (ENTRANCE -> ROUND_START -> PLAYING)
-    // In PLAYING state, the opponent fighter and HUD are active, and menu is gone
-    const opponentFighter = page.locator('[data-testid="opponent-fighter"]');
-    await expect(opponentFighter).toBeVisible({ timeout: 15000 });
+    // Wait for data-game-state="PLAYING" per spec requirement
+    await page.waitForFunction(
+      () => document.querySelector('[data-game-state]')?.getAttribute('data-game-state') === 'PLAYING',
+      null,
+      { timeout: 15000 }
+    );
 
-    // Ensure fight is in progress (clock/HUD visible)
-    await page.waitForTimeout(1000);
+    // Wait for the round clock to advance >= 1s (1200ms)
+    await page.waitForTimeout(1200);
+
+    // Verify the canvas is visible
+    const canvas = page.locator('canvas.game-canvas');
+    await expect(canvas).toBeVisible();
 
     // Assert no unhandled page errors
     expect(pageErrors).toHaveLength(0);
