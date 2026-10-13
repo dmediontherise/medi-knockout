@@ -127,9 +127,9 @@ const App: React.FC = () => {
       {/* --- Game Scene (NES Canvas Renderer) --- */}
       <div 
         data-testid="opponent-fighter"
-        className={`relative w-full ${posePreviewState ? 'h-full flex-1' : 'max-w-[768px] mx-auto flex-1'} flex flex-col items-center justify-center overflow-hidden bg-black min-h-0 shadow-2xl`}
+        className="relative w-full flex-1 flex flex-col items-center justify-center overflow-hidden bg-black min-h-0 shadow-2xl"
       >
-        <GameCanvas state={activeState} />
+        <GameCanvas state={activeState} isPosePreview={!!posePreviewState} />
       </div>
 
       {/* --- Menus (Overlay) --- */}

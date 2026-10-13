@@ -8,6 +8,7 @@
     "dev": "vite",
     "build": "vite build",
     "test": "vitest run",
+    "sprites": "node scripts/build-sprites.mjs",
     "e2e": "playwright test",
     "deploy": "gh-pages -d dist",
     "preview": "vite preview"

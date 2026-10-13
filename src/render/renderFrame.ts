@@ -137,11 +137,8 @@ export function renderFrame(
   ctx: CanvasRenderingContext2D,
   state: FightState
 ) {
-  if (!pixelBuffer || pixelBuffer.width !== CANVAS_WIDTH || pixelBuffer.height !== CANVAS_HEIGHT) {
-    pixelBuffer = ctx.createImageData(CANVAS_WIDTH, CANVAS_HEIGHT);
-  }
-
-  const data = pixelBuffer.data;
+  const imgData = ctx.createImageData(CANVAS_WIDTH, CANVAS_HEIGHT);
+  const data = imgData.data;
   const frame = state.frame;
   const flash = Math.floor(frame / 8) % 2 === 0;
 
@@ -180,19 +177,21 @@ export function renderFrame(
   }
 
   // 4. Draw Opponent
-  // Opponent is centered at x: 128 ± 8 -> width 48 so top-left x = 128 - 24 = 104
+  // Opponent sprite is 112-150px tall (e.g. 140px tall).
+  // Positioned below HUD (y >= 48) at y = 50, centered at x: 128 ± 8.
   const oppSprite = getOpponentSprite(state.opponentId, state.opponent.action, frame);
-  const oppX = 104;
-  const oppY = 72; // Opponent stands at y: 72..168 (96px height)
+  const oppX = Math.round(128 - oppSprite.width / 2);
+  const oppY = 50; // below HUD (y >= 48)
 
   // Star opportunity flash effect on opponent
   const oppOverride = (state.opponent.starOpportunity && flash) ? 0x20 : undefined;
   blitSprite(data, oppSprite, oppX, oppY, oppOverride);
 
-  // 5. Draw Player (Seen from behind)
-  // Base position centered: x = 128 - 18 = 110, y = 146..200 (54px tall)
-  let playerX = 110;
-  let playerY = 146;
+  // 5. Draw Player (Seen from behind, small at lower center overlapping opponent's lower body)
+  // Base position centered: x = 128 - 24 = 104, y = 168 (72px tall -> y: 168..240)
+  const playerSprite = resolvePlayerSprite(state.player.action, state.player.isExhausted);
+  let playerX = Math.round(128 - playerSprite.width / 2);
+  let playerY = 168;
 
   // Dodge shifts exactly 24px per spec
   if (state.player.action === 'DODGE_LEFT') {
@@ -203,7 +202,6 @@ export function renderFrame(
     playerY += 12; // Lowers 12px per spec
   }
 
-  const playerSprite = resolvePlayerSprite(state.player.action, state.player.isExhausted);
   blitSprite(data, playerSprite, playerX, playerY);
 
   // 6. Hit feedback flash (white/red flash on hit)
@@ -213,5 +211,5 @@ export function renderFrame(
   }
 
   // Blit final pixel buffer to canvas
-  ctx.putImageData(pixelBuffer, 0, 0);
+  ctx.putImageData(imgData, 0, 0);
 }
