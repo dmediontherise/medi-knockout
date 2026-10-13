@@ -1,10 +1,25 @@
-import { test, expect } from '@playwright/test';
+import { test, expect, type Page } from '@playwright/test';
 import * as fs from 'fs';
 import * as path from 'path';
 import { PNG } from 'pngjs';
 import { Jimp } from 'jimp';
 import { NES_PALETTE } from '../../src/render/nesPalette';
 import { FONT_8X8 } from '../../src/render/sprites/font';
+
+// Task 016 Requirement 3: wait on observable state instead of a fixed timeout.
+// A pose preview sets data-game-state="PLAYING" and renders the requested frame in an
+// effect. Waiting for the state, then for two animation frames, guarantees the canvas
+// has drawn the pose before the screenshot is taken, however loaded the host is.
+async function waitForPose(page: Page): Promise<void> {
+  await page.waitForFunction(
+    () => document.querySelector('[data-game-state]')?.getAttribute('data-game-state') === 'PLAYING',
+    null,
+    { timeout: 10000 }
+  );
+  await page.evaluate(
+    () => new Promise<void>((resolve) => requestAnimationFrame(() => requestAnimationFrame(() => resolve())))
+  );
+}
 
 const OPPONENT_IDS = ['aint_man', 'medi_jinx', 'dj_tito', 'mr_yankee', 'maga_man'];
 
@@ -120,7 +135,7 @@ test.describe('Pose Preview and Contact Sheets Suite', () => {
 
         const canvas = page.locator('canvas.game-canvas');
         await expect(canvas).toBeVisible();
-        await page.waitForTimeout(50);
+        await waitForPose(page);
 
         expect(pageErrors).toHaveLength(0);
 
@@ -143,7 +158,7 @@ test.describe('Pose Preview and Contact Sheets Suite', () => {
 
       const canvas = page.locator('canvas.game-canvas');
       await expect(canvas).toBeVisible();
-      await page.waitForTimeout(50);
+      await waitForPose(page);
 
       expect(pageErrors).toHaveLength(0);
 
@@ -198,7 +213,7 @@ test.describe('Pose Preview and Contact Sheets Suite', () => {
 
       const canvas = page.locator('canvas.game-canvas');
       await expect(canvas).toBeVisible();
-      await page.waitForTimeout(50);
+      await waitForPose(page);
 
       expect(pageErrors).toHaveLength(0);
 
@@ -372,7 +387,7 @@ test.describe('Pose Preview and Contact Sheets Suite', () => {
 
         const canvas = page.locator('canvas.game-canvas');
         await expect(canvas).toBeVisible();
-        await page.waitForTimeout(50);
+        await waitForPose(page);
         expect(pageErrors).toHaveLength(0);
 
         const screenshotPath = path.join(fallDir, `${oppId}-KO-${n}.png`);
@@ -391,7 +406,7 @@ test.describe('Pose Preview and Contact Sheets Suite', () => {
       await page.goto(`./?pose=${oppId}&action=KO&player=IDLE&frame=35`);
       const canvas = page.locator('canvas.game-canvas');
       await expect(canvas).toBeVisible();
-      await page.waitForTimeout(50);
+      await waitForPose(page);
       await canvas.screenshot({ path: emptyPath });
       const emptyFrame = await Jimp.read(emptyPath);
       if (emptyFrame.bitmap.width !== 256 || emptyFrame.bitmap.height !== 240) {
@@ -468,7 +483,7 @@ test.describe('Pose Preview and Contact Sheets Suite', () => {
           await page.goto(`./?${item.query}`);
           const canvas = page.locator('canvas.game-canvas');
           await expect(canvas).toBeVisible();
-          await page.waitForTimeout(50);
+          await waitForPose(page);
           expect(pageErrors).toHaveLength(0);
 
           const filePath = path.join(feelDir, item.filename);

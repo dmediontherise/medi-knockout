@@ -19,6 +19,7 @@ const App: React.FC = () => {
     currentOpponent, 
     activeSpecial, 
     fightState, 
+    hitStopRemaining,
     handlePlayerInput, 
     releaseBlock, 
     resetGame 
@@ -256,8 +257,12 @@ const App: React.FC = () => {
   return (
     <div 
       data-game-state={effectiveGameState}
+      data-screen-mode={currentScreenMode}
+      data-circuit-selected={circuitSelectedIndex}
       data-round={activeState.round}
+      data-game-clock={activeState.gameClockSeconds}
       data-referee-count={activeState.referee.count}
+      data-hitstop={hitStopRemaining}
       className={`fixed inset-0 w-full h-[100dvh] bg-slate-950 overflow-hidden flex flex-col items-center select-none touch-none ${isPlayerHit ? 'animate-shake' : ''}`}
     >
       <style>{`

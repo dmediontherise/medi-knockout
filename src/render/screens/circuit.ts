@@ -1,6 +1,6 @@
 import { nesToRgba } from '../nesPalette';
 import { drawBitmapText, drawBitmapText2x } from '../sprites/font';
-import { blitSpriteCrop, CANVAS_WIDTH, CANVAS_HEIGHT } from '../sprites/blit';
+import { blitSpriteCrop, blitSpriteScaled, CANVAS_WIDTH, CANVAS_HEIGHT } from '../sprites/blit';
 import { OPPONENT_PRESENTATION, CIRCUIT_ROSTER_IDS, getPortraitCrop } from './presentationData';
 
 // Footer instructions, split across two lines so they fit inside x 8-248 (0x20 white)
@@ -95,18 +95,19 @@ export function renderCircuitScreen(
     }
 
     if (isUnlocked && info) {
-      // Blit cropped portrait (32x32 head crop)
+      // Blit cropped portrait (32x32 head and shoulders crop scaled with nearest-neighbour)
       const crop = getPortraitCrop(oppId, 32);
-      blitSpriteCrop(
+      blitSpriteScaled(
         data,
         info.sprite,
         pX + 1,
         pY + 1,
+        32,
+        32,
         crop.x,
         crop.y,
-        32,
-        32,
-        1
+        crop.w,
+        crop.h
       );
 
       // Name & Record

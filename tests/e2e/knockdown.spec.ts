@@ -64,12 +64,30 @@ test.describe('Real knockdown in play', () => {
     const canvas = page.locator('canvas.game-canvas');
     await expect(canvas).toBeVisible();
 
-    // Mash punch until the opponent is knocked down and the referee counts
-    for (let attempt = 0; attempt < 40; attempt++) {
-      const countAttr = await page.locator('[data-game-state]').getAttribute('data-referee-count');
-      if (countAttr && parseInt(countAttr, 10) >= 1) break;
-      await page.keyboard.press('KeyZ');
-      await page.waitForTimeout(60);
+    // Mash punch until the opponent is knocked down and the referee starts counting.
+    // Poll the observable data-referee-count instead of pacing with a fixed sleep.
+    // Hold HEAD so KeyZ is a head punch that lands past the debug opponent's LOW guard.
+    // Read state before pressing (z also advances menus; only mash while PLAYING).
+    await page.keyboard.down('ArrowUp');
+    try {
+      await expect
+        .poll(
+          async () => {
+            const el = page.locator('[data-game-state]');
+            const state = await el.getAttribute('data-game-state');
+            const attr = await el.getAttribute('data-referee-count');
+            const count = attr ? parseInt(attr, 10) : 0;
+            if (count >= 1) return count;
+            if (state === 'PLAYING') {
+              await page.keyboard.press('KeyZ');
+            }
+            return count;
+          },
+          { timeout: 30000, intervals: [60, 90, 120, 150] }
+        )
+        .toBeGreaterThanOrEqual(1);
+    } finally {
+      await page.keyboard.up('ArrowUp');
     }
 
     // Wait until referee count reaches at least 2 (opponent clearly on the canvas)
@@ -90,25 +108,25 @@ test.describe('Real knockdown in play', () => {
     const screenshotPath = path.join(screenshotsDir, 'knockdown-aint_man.png');
     const emptyPath = path.join(screenshotsDir, '.knockdown-empty-reference.png');
 
-    // Capture until the drawn count digit matches the current data-referee-count
+    // Capture until the drawn count digit matches the current data-referee-count.
+    // Poll the observable attribute and the drawn canvas instead of fixed sleeps.
     let count = 0;
     let live: PNG | null = null;
-    let ok = false;
-    for (let attempt = 0; attempt < 8 && !ok; attempt++) {
-      const attr = await page.locator('[data-game-state]').getAttribute('data-referee-count');
-      count = attr ? parseInt(attr, 10) : 0;
-      if (count < 2) {
-        await page.waitForTimeout(80);
-        continue;
-      }
-      await canvas.screenshot({ path: screenshotPath });
-      live = readPng(screenshotPath);
-      ok = digitMatches(live, count);
-      if (!ok) await page.waitForTimeout(60);
-    }
+    await expect
+      .poll(
+        async () => {
+          const attr = await page.locator('[data-game-state]').getAttribute('data-referee-count');
+          count = attr ? parseInt(attr, 10) : 0;
+          if (count < 2) return false;
+          await canvas.screenshot({ path: screenshotPath });
+          live = readPng(screenshotPath);
+          return digitMatches(live, count);
+        },
+        { timeout: 15000, intervals: [100, 150, 200, 250] }
+      )
+      .toBe(true);
 
     expect(count, 'referee count reached at least 2').toBeGreaterThanOrEqual(2);
-    expect(ok, 'count digit matches the referee count sprite at its drawn position').toBe(true);
 
     const k = live!.width / 256;
     expect(Number.isInteger(k), `canvas scale factor is integer (width=${live!.width})`).toBe(true);
@@ -117,7 +135,15 @@ test.describe('Real knockdown in play', () => {
     // is not drawn (same technique as poses.spec.ts).
     await page.goto(`./?pose=${OPP}&action=KO&player=IDLE&frame=44`);
     await expect(canvas).toBeVisible();
-    await page.waitForTimeout(80);
+    // Pose preview: wait for the preview state, then for the canvas to have drawn it.
+    await page.waitForFunction(
+      () => document.querySelector('[data-game-state]')?.getAttribute('data-game-state') === 'PLAYING',
+      null,
+      { timeout: 10000 }
+    );
+    await page.evaluate(
+      () => new Promise<void>((resolve) => requestAnimationFrame(() => requestAnimationFrame(() => resolve())))
+    );
     await canvas.screenshot({ path: emptyPath });
     const empty = readPng(emptyPath);
     expect(empty.width, 'reference frame has the same scale').toBe(live!.width);

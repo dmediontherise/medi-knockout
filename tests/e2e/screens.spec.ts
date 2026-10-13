@@ -62,7 +62,11 @@ test.describe('Presentation screens e2e (Task 009 Req 11)', () => {
 
     // 2. Advance to Circuit Select (Press Enter or Space)
     await page.keyboard.press('Enter');
-    await page.waitForTimeout(100);
+    await page.waitForFunction(
+      () => document.querySelector('[data-screen-mode]')?.getAttribute('data-screen-mode') === 'CIRCUIT',
+      null,
+      { timeout: 10000 }
+    );
 
     // Capture Circuit Screen screenshot
     const circuitPath = path.join(screensDir, 'circuit.png');
@@ -71,11 +75,19 @@ test.describe('Presentation screens e2e (Task 009 Req 11)', () => {
     verifyPngNesPalette(circuitPath);
 
     // 3. Navigate to dj_tito (index 2: aint_man -> medi_jinx -> dj_tito)
-    // Press ArrowDown twice
+    // Press ArrowDown twice and wait for circuit selection index to update
     await page.keyboard.press('ArrowDown');
-    await page.waitForTimeout(50);
+    await page.waitForFunction(
+      () => document.querySelector('[data-circuit-selected]')?.getAttribute('data-circuit-selected') === '1',
+      null,
+      { timeout: 5000 }
+    );
     await page.keyboard.press('ArrowDown');
-    await page.waitForTimeout(50);
+    await page.waitForFunction(
+      () => document.querySelector('[data-circuit-selected]')?.getAttribute('data-circuit-selected') === '2',
+      null,
+      { timeout: 5000 }
+    );
 
     // Press Enter to pick DJ Tito
     await page.keyboard.press('Enter');
@@ -120,22 +132,37 @@ test.describe('Presentation screens e2e (Task 009 Req 11)', () => {
       { timeout: 15000 }
     );
 
-    // Punch opponent repeatedly until VICTORY state is reached
-    // If opponent gets knocked down, referee counts to 10 (~7.5s) or opponent gets up and is punched down again
-    for (let attempt = 0; attempt < 60; attempt++) {
-      const state = await page.locator('[data-game-state]').getAttribute('data-game-state');
-      if (state === 'VICTORY') break;
-      await page.keyboard.press('KeyZ');
-      await page.waitForTimeout(500);
+    // Punch opponent until VICTORY. Poll the observable game state while mashing
+    // instead of sleeping a fixed 500 ms between presses. Hold HEAD (ArrowUp) so KeyZ
+    // is a head punch that lands past the debug opponent's LOW guard (faster, larger
+    // margin). Read the state BEFORE pressing: a punch key (z) also advances/dismisses
+    // menu and result screens, so pressing after the match ends would dismiss VICTORY
+    // before we can observe it.
+    // If opponent gets knocked down, referee counts to 10 or opponent gets up and is punched down again.
+    await page.keyboard.down('ArrowUp');
+    try {
+      await expect
+        .poll(
+          async () => {
+            const state = await page.locator('[data-game-state]').getAttribute('data-game-state');
+            if (state === 'PLAYING') {
+              await page.keyboard.press('KeyZ');
+            }
+            return state;
+          },
+          { timeout: 45000, intervals: [200, 300, 400] }
+        )
+        .toBe('VICTORY');
+    } finally {
+      await page.keyboard.up('ArrowUp');
     }
 
+    // Wait for screen mode to observe RESULTS
     await page.waitForFunction(
-      () => document.querySelector('[data-game-state]')?.getAttribute('data-game-state') === 'VICTORY',
+      () => document.querySelector('[data-screen-mode]')?.getAttribute('data-screen-mode') === 'RESULTS',
       null,
-      { timeout: 35000 }
+      { timeout: 5000 }
     );
-
-    await page.waitForTimeout(100);
 
     const resultPath = path.join(screensDir, 'result-win.png');
     await canvas.screenshot({ path: resultPath });

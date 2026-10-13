@@ -1,6 +1,6 @@
 import { nesToRgba } from '../nesPalette';
 import { drawBitmapText, drawBitmapText2x } from '../sprites/font';
-import { blitSpriteCrop, CANVAS_WIDTH, CANVAS_HEIGHT } from '../sprites/blit';
+import { blitSpriteCrop, blitSpriteScaled, CANVAS_WIDTH, CANVAS_HEIGHT } from '../sprites/blit';
 import { OPPONENT_PRESENTATION, getPortraitCrop, wrapText } from './presentationData';
 
 export function renderIntroScreen(
@@ -59,16 +59,17 @@ export function renderIntroScreen(
   }
 
   const crop = getPortraitCrop(oppId, 48);
-  blitSpriteCrop(
+  blitSpriteScaled(
     data,
     info.sprite,
     portX + 2,
     portY + 2,
+    48,
+    48,
     crop.x,
     crop.y,
-    48,
-    48,
-    1
+    crop.w,
+    crop.h
   );
 
   // Right column: VS banner and opponent details

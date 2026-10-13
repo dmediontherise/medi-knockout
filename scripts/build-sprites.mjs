@@ -384,23 +384,26 @@ async function buildAllSprites() {
     }
 
     if (usesLie) {
-      // AINT MAN LIE: rotate idle figure 0 by 90 deg counter-clockwise (lossless transpose),
-      // then scale down with nearest-neighbour so height <= 86 px and width 105-125 px.
-      const idle = sprites['FIG_0'];
-      const transW = idle.height; // 140
-      const transH = idle.width;  // 107
+      // AINT MAN LIE: source figure at box [167, 377, 242, 462], quantized with the same color pipeline,
+      // rotated exactly 90 deg counter-clockwise (helmet at screen-left), and nearest-neighbour scaled so that
+      // height <= 86 px and width is 95-125 px.
+      const lieBox = { x: 167, y: 377, w: 242 - 167 + 1, h: 462 - 377 + 1 };
+      const lieSrcSprite = await processSpriteImage(img, lieBox, lieBox.w, lieBox.h, opp.id, false, charPalette);
+
+      const transW = lieSrcSprite.height; // 86
+      const transH = lieSrcSprite.width;  // 76
       const transRows = [];
       for (let y = 0; y < transH; y++) {
         let r = '';
         for (let x = 0; x < transW; x++) {
-          const sx = (idle.width - 1) - y;
+          const sx = (lieSrcSprite.width - 1) - y;
           const sy = x;
-          r += idle.rows[sy][sx];
+          r += lieSrcSprite.rows[sy][sx];
         }
         transRows.push(r);
       }
 
-      // Nearest-neighbour scale down to width: 112, height: 85
+      // Nearest-neighbour scale to width: 112, height: 85 (height <= 86 px, width in 95-125 px)
       const lieW = 112;
       const lieH = 85;
       const lieRows = [];
@@ -414,10 +417,11 @@ async function buildAllSprites() {
         lieRows.push(r);
       }
 
+      sprites['LIE_SRC'] = lieSrcSprite;
       sprites['LIE'] = {
         width: lieW,
         height: lieH,
-        palette: idle.palette,
+        palette: charPalette,
         rows: lieRows,
       };
     }
@@ -452,7 +456,7 @@ async function buildAllSprites() {
     content += `export const ${upId}_FRAMES: Record<number | string, SpriteData> = {\n`;
     content += `  0: IDLE_BASE_${upId},\n`;
     for (const key of Object.keys(sprites)) {
-      if (key === 'FIG_0') continue;
+      if (key === 'FIG_0' || key === 'LIE_SRC') continue;
       if (key === 'LIE') {
         content += `  LIE: ${upId}_LIE,\n`;
       } else {

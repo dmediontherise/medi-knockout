@@ -29,6 +29,7 @@ import {
   isPlayerSteppingAside,
   PLAYER_STEP_ASIDE_MIN_X,
 } from '../../src/render/renderFrame';
+import { blitSpriteScaled } from '../../src/render/sprites/blit';
 import { nesToRgba } from '../../src/render/nesPalette';
 import {
   renderCircuitScreen,
@@ -40,11 +41,12 @@ import {
   OPPONENT_PRESENTATION,
   CIRCUIT_ROSTER_IDS,
   getPortraitCrop,
+  computePortraitCrop,
   wrapText,
 } from '../../src/render/screens/presentationData';
 import { drawBitmapText, FONT_8X8 } from '../../src/render/sprites/font';
 import { createFight } from '../../src/core/engine';
-import { IDLE_BASE_AINT_MAN, AINT_MAN_LIE } from '../../src/render/sprites/generated/aint_man';
+import { IDLE_BASE_AINT_MAN, AINT_MAN_LIE, AINT_MAN_LIE_SRC } from '../../src/render/sprites/generated/aint_man';
 import { IDLE_BASE_MEDI_JINX } from '../../src/render/sprites/generated/medi_jinx';
 import { IDLE_BASE_DJ_TITO } from '../../src/render/sprites/generated/dj_tito';
 import { SPARK_SPRITE, STAR_SPRITE } from '../../src/render/sprites/effects';
@@ -842,41 +844,79 @@ describe('Task 010 R8: knockdown count digit', () => {
 });
 
 // Requirement 10: readable portraits
-describe('Task 010 R10: readable head portraits', () => {
-  for (const oppId of CIRCUIT_ROSTER_IDS) {
-    it(`${oppId} 32x32 circuit portrait is >= 45% opaque with pixels in the top rows`, () => {
-      const info = OPPONENT_PRESENTATION[oppId];
-      const crop = getPortraitCrop(oppId, 32);
-      let opaque = 0;
-      for (let y = 0; y < 32; y++) {
-        for (let x = 0; x < 32; x++) {
-          const ch = info.sprite.rows[crop.y + y]?.[crop.x + x];
-          if (ch && ch !== '.' && ch !== ' ') opaque++;
-        }
-      }
-      expect(opaque).toBeGreaterThanOrEqual(Math.ceil(0.45 * 32 * 32));
+// Task 016 Requirement 1: readable head and shoulders portraits
+describe('Task 016 Requirement 1: portraits show head and shoulders', () => {
+  const NES_BLACKS = new Set([0x0e, 0x0f, 0x1d, 0x1e, 0x1f, 0x2e, 0x2f, 0x3e, 0x3f]);
 
-      let topOpaque = 0;
-      for (let y = 0; y < 4; y++) {
-        for (let x = 0; x < 32; x++) {
-          const ch = info.sprite.rows[crop.y + y]?.[crop.x + x];
-          if (ch && ch !== '.' && ch !== ' ') topOpaque++;
+  for (const oppId of CIRCUIT_ROSTER_IDS) {
+    it(`${oppId}: crop source height is >= 0.40 * idle opaque height`, () => {
+      const info = OPPONENT_PRESENTATION[oppId];
+      const sprite = info.sprite;
+      let firstOpaque = -1;
+      let lastOpaque = -1;
+      for (let y = 0; y < sprite.height; y++) {
+        const row = sprite.rows[y];
+        if (row && row.split('').some((c) => c !== '.' && c !== ' ')) {
+          if (firstOpaque < 0) firstOpaque = y;
+          lastOpaque = y;
         }
       }
-      expect(topOpaque).toBeGreaterThan(0);
+      const opaqueH = lastOpaque - firstOpaque + 1;
+      const crop = getPortraitCrop(oppId, 32);
+
+      expect(crop.h, `${oppId} crop height >= 0.40 * opaque height`).toBeGreaterThanOrEqual(0.4 * opaqueH);
     });
 
-    it(`${oppId} 48x48 intro portrait is >= 45% opaque`, () => {
+    it(`${oppId}: drawn 32x32 circuit portrait has >= 50% opaque pixels and >= 3 distinct non-black NES colors`, () => {
       const info = OPPONENT_PRESENTATION[oppId];
-      const crop = getPortraitCrop(oppId, 48);
-      let opaque = 0;
-      for (let y = 0; y < 48; y++) {
-        for (let x = 0; x < 48; x++) {
-          const ch = info.sprite.rows[crop.y + y]?.[crop.x + x];
-          if (ch && ch !== '.' && ch !== ' ') opaque++;
+      const crop = getPortraitCrop(oppId, 32);
+
+      let opaqueCount = 0;
+      const colors = new Set<number>();
+      for (let dy = 0; dy < 32; dy++) {
+        const sy = crop.y + Math.floor((dy * crop.h) / 32);
+        for (let dx = 0; dx < 32; dx++) {
+          const sx = crop.x + Math.floor((dx * crop.w) / 32);
+          const ch = info.sprite.rows[sy]?.[sx];
+          if (ch && ch !== '.' && ch !== ' ') {
+            opaqueCount++;
+            const nesColor = info.sprite.palette[ch];
+            if (nesColor !== undefined && !NES_BLACKS.has(nesColor)) {
+              colors.add(nesColor);
+            }
+          }
         }
       }
-      expect(opaque).toBeGreaterThanOrEqual(Math.ceil(0.45 * 48 * 48));
+
+      const ratio = opaqueCount / (32 * 32);
+      expect(ratio, `${oppId} 32x32 portrait >= 50% opaque`).toBeGreaterThanOrEqual(0.5);
+      expect(colors.size, `${oppId} 32x32 portrait has at least 3 distinct non-black NES colors`).toBeGreaterThanOrEqual(3);
+    });
+
+    it(`${oppId}: drawn 48x48 intro portrait has >= 50% opaque pixels and >= 3 distinct non-black NES colors`, () => {
+      const info = OPPONENT_PRESENTATION[oppId];
+      const crop = getPortraitCrop(oppId, 48);
+
+      let opaqueCount = 0;
+      const colors = new Set<number>();
+      for (let dy = 0; dy < 48; dy++) {
+        const sy = crop.y + Math.floor((dy * crop.h) / 48);
+        for (let dx = 0; dx < 48; dx++) {
+          const sx = crop.x + Math.floor((dx * crop.w) / 48);
+          const ch = info.sprite.rows[sy]?.[sx];
+          if (ch && ch !== '.' && ch !== ' ') {
+            opaqueCount++;
+            const nesColor = info.sprite.palette[ch];
+            if (nesColor !== undefined && !NES_BLACKS.has(nesColor)) {
+              colors.add(nesColor);
+            }
+          }
+        }
+      }
+
+      const ratio = opaqueCount / (48 * 48);
+      expect(ratio, `${oppId} 48x48 portrait >= 50% opaque`).toBeGreaterThanOrEqual(0.5);
+      expect(colors.size, `${oppId} 48x48 portrait has at least 3 distinct non-black NES colors`).toBeGreaterThanOrEqual(3);
     });
   }
 });
@@ -1080,9 +1120,9 @@ describe('Task 012: Real animation frames from sheets', () => {
 
       for (const [key, sprite] of Object.entries(frameMap)) {
         if (key === 'LIE') {
-          // Per Task 013 Requirement 2: Aint Man LIE is scaled down so height <= 86 px and width 105-125 px
+          // Per Task 016 Requirement 2: Aint Man LIE is scaled down so height <= 86 px and width 95-125 px
           expect(sprite.height, `Character ${id} LIE height <= 86 px`).toBeLessThanOrEqual(86);
-          expect(sprite.width, `Character ${id} LIE width >= 105 px`).toBeGreaterThanOrEqual(105);
+          expect(sprite.width, `Character ${id} LIE width >= 95 px`).toBeGreaterThanOrEqual(95);
           expect(sprite.width, `Character ${id} LIE width <= 125 px`).toBeLessThanOrEqual(125);
         } else {
           const figIdx = parseInt(key, 10);
@@ -1260,25 +1300,27 @@ describe('Task 012: Real animation frames from sheets', () => {
     }
   });
 
-  // Task 013 Requirement 1 & 2: AINT MAN LIE direction and size
-  it('Requirement 1 & 2: AINT MAN LIE is rotated 90 deg CCW (structural transpose), left 25% holds former top rows, height <= 86 px, width 105-125 px', () => {
-    // Height <= 86 px and width 105-125 px
+  // Task 016 Requirement 2: AINT MAN sprawled knockdown
+  it('Requirement 2: AINT MAN LIE is rotated 90 deg CCW from source figure at box [167,377,242,462], height <= 86 px, width 95-125 px', () => {
+    // Direct assertions on width and height
+    expect(AINT_MAN_LIE.width).toBe(112);
+    expect(AINT_MAN_LIE.height).toBe(85);
     expect(AINT_MAN_LIE.height, 'AINT_MAN_LIE height <= 86 px').toBeLessThanOrEqual(86);
-    expect(AINT_MAN_LIE.width, 'AINT_MAN_LIE width >= 105 px').toBeGreaterThanOrEqual(105);
+    expect(AINT_MAN_LIE.width, 'AINT_MAN_LIE width >= 95 px').toBeGreaterThanOrEqual(95);
     expect(AINT_MAN_LIE.width, 'AINT_MAN_LIE width <= 125 px').toBeLessThanOrEqual(125);
 
     // 1. Structural transpose test:
-    // Take idle figure 0 and rotate it 90 deg CCW: top row becomes left column
-    const idle = IDLE_BASE_AINT_MAN;
-    const transW = idle.height; // 140
-    const transH = idle.width;  // 107
+    // Take AINT_MAN_LIE_SRC (the unrotated source figure) and rotate it 90 deg CCW:
+    const src = AINT_MAN_LIE_SRC;
+    const transW = src.height; // 86
+    const transH = src.width;  // 76
     const transRows: string[] = [];
     for (let y = 0; y < transH; y++) {
       let r = '';
       for (let x = 0; x < transW; x++) {
-        const sx = (idle.width - 1) - y;
+        const sx = (src.width - 1) - y;
         const sy = x;
-        r += idle.rows[sy][sx];
+        r += src.rows[sy][sx];
       }
       transRows.push(r);
     }
@@ -1298,17 +1340,7 @@ describe('Task 012: Real animation frames from sheets', () => {
     }
 
     // Assert it equals the LIE rows exactly
-    expect(AINT_MAN_LIE.rows, 'AINT_MAN_LIE matches 90 deg CCW nearest-neighbour scale of idle figure 0').toEqual(scaledRows);
-
-    // 2. Left 25% of LIE columns holds the sprite's former top rows (the helmet):
-    // The opaque pixels of idle rows 0-20 all land in LIE columns < 25% of its width
-    const left25Col = Math.floor(lieW * 0.25);
-    for (let lieX = 0; lieX < lieW; lieX++) {
-      const sx = Math.floor(lieX * transW / lieW);
-      if (sx <= 20) {
-        expect(lieX, `LIE column ${lieX} corresponding to idle row ${sx} is in leftmost 25% (< ${left25Col})`).toBeLessThan(left25Col);
-      }
-    }
+    expect(AINT_MAN_LIE.rows, 'AINT_MAN_LIE matches 90 deg CCW nearest-neighbour scale of source figure').toEqual(scaledRows);
   });
 
   // Task 013 Requirement 4: Bounds for all five opponents at actionFrame 30
@@ -2208,6 +2240,133 @@ describe('Task 015: Fight feel tests (Screen shake, Directional hit, Punch lunge
         }
       }
       expect(kneeMinRow, 'knee rows are above torso top row').toBeLessThan(torsoMinRow);
+    });
+  });
+
+  // Task 016 Requirement 6: Close task 015 test gaps (M3, M4, M5, M8)
+  describe('Task 016 Requirement 6: Close task 015 test gaps', () => {
+    // M3: the KNOCKED_DOWN frames 0-9 are mirrored per lastHitSide
+    it('M3: KNOCKED_DOWN frames 0-9 are mirrored per lastHitSide', () => {
+      const rosterIds = ['aint_man', 'medi_jinx', 'dj_tito', 'mr_yankee', 'maga_man'] as const;
+      for (const id of rosterIds) {
+        for (let af = 0; af < 10; af++) {
+          const leftSprite = getOpponentSprite(id, 'KNOCKED_DOWN', af, 'LEFT', 'HEAD');
+          const rightSprite = getOpponentSprite(id, 'KNOCKED_DOWN', af, 'RIGHT', 'HEAD');
+
+          // Left sprite rows should be horizontal reverse of right sprite rows
+          for (let y = 0; y < leftSprite.height; y++) {
+            const leftRow = leftSprite.rows[y];
+            const rightRow = rightSprite.rows[y];
+            const reversedRight = rightRow.split('').reverse().join('');
+            expect(leftRow, `${id} KD frame ${af} row ${y} mirrored`).toBe(reversedRight);
+          }
+        }
+      }
+    });
+
+    // M4: the HIT displacement at frame 8 is strictly between 0 and 6
+    it('M4: HIT displacement at frame 8 is strictly between 0 and 6', () => {
+      // dir for LEFT is +1 -> hitDx = Math.round(6 * (1 - 3/5)) = 2
+      // dir for RIGHT is -1 -> hitDx = -2
+      // Magnitude |hitDx| must be strictly between 0 and 6
+      const leftDraw = computeOpponentDraw('aint_man', 'HIT', 8, 0, 'LEFT', 'HEAD');
+      const rightDraw = computeOpponentDraw('aint_man', 'HIT', 8, 0, 'RIGHT', 'HEAD');
+      const baseDraw = computeOpponentDraw('aint_man', 'HIT', 12, 0, 'RIGHT', 'HEAD'); // 0 displacement
+
+      // Displacement from base:
+      const leftDisp = leftDraw.x - baseDraw.x;
+      const rightDisp = rightDraw.x - baseDraw.x;
+
+      expect(leftDisp, 'left displacement at frame 8 > 0').toBeGreaterThan(0);
+      expect(leftDisp, 'left displacement at frame 8 < 6').toBeLessThan(6);
+
+      expect(rightDisp, 'right displacement at frame 8 < 0').toBeLessThan(0);
+      expect(rightDisp, 'right displacement at frame 8 > -6').toBeGreaterThan(-6);
+    });
+
+    // M5: the lunge at mid-recovery is strictly between the active value and 0
+    it('M5: lunge at mid-recovery is strictly between the active value and 0', () => {
+      // JAB: activeFrames = 8, recoveryFrames = 18 (mid-recovery at actionFrame 17)
+      const jabActive = computeOpponentLunge('PUNCH_JAB_LEFT', 0);
+      const jabMid = computeOpponentLunge('PUNCH_JAB_LEFT', 17);
+      expect(jabMid.lungeDy, 'JAB mid-recovery dy > 0').toBeGreaterThan(0);
+      expect(jabMid.lungeDy, 'JAB mid-recovery dy < active value').toBeLessThan(jabActive.lungeDy);
+
+      // HOOK: activeFrames = 10, recoveryFrames = 22 (mid-recovery at actionFrame 21)
+      const hookActive = computeOpponentLunge('PUNCH_HOOK_LEFT', 0);
+      const hookMid = computeOpponentLunge('PUNCH_HOOK_LEFT', 21);
+      expect(hookMid.lungeDx, 'HOOK mid-recovery dx > 0').toBeGreaterThan(0);
+      expect(hookMid.lungeDx, 'HOOK mid-recovery dx < active value').toBeLessThan(hookActive.lungeDx);
+      expect(hookMid.lungeDy, 'HOOK mid-recovery dy > 0').toBeGreaterThan(0);
+      expect(hookMid.lungeDy, 'HOOK mid-recovery dy < active value').toBeLessThan(hookActive.lungeDy);
+
+      // UPPERCUT: activeFrames = 12, recoveryFrames = 28 (mid-recovery at actionFrame 26)
+      const uppActive = computeOpponentLunge('PUNCH_UPPERCUT_LEFT', 0);
+      const uppMid = computeOpponentLunge('PUNCH_UPPERCUT_LEFT', 26);
+      expect(uppMid.lungeDy, 'UPPERCUT mid-recovery dy > 0').toBeGreaterThan(0);
+      expect(uppMid.lungeDy, 'UPPERCUT mid-recovery dy < active value').toBeLessThan(uppActive.lungeDy);
+    });
+
+    // M8: the referee is shaken during the opponent's mat landing in KNOCKDOWN_COUNT
+    it('M8: referee is shaken during opponent mat landing in KNOCKDOWN_COUNT', () => {
+      function createMockCanvas(): { ctx: CanvasRenderingContext2D; buffer: Uint8ClampedArray } {
+        const buffer = new Uint8ClampedArray(CANVAS_WIDTH * CANVAS_HEIGHT * 4);
+        const ctx = {
+          createImageData: (w: number, h: number) => ({ width: w, height: h, data: buffer }),
+          putImageData: (imgData: any) => { buffer.set(imgData.data); },
+        } as unknown as CanvasRenderingContext2D;
+        return { ctx, buffer };
+      }
+
+      const f = createFight('aint_man', 1);
+      f.phase = 'KNOCKDOWN_COUNT';
+      f.opponent.action = 'KNOCKED_DOWN';
+      f.opponent.actionFrame = 10; // opponent mat landing: shakeY = +3
+      const m = createMockCanvas();
+      renderFrame(m.ctx, f);
+
+      const { shakeX, shakeY } = computeScreenShake(f);
+      expect(shakeY, 'mat landing produces a vertical shake').not.toBe(0);
+
+      // Opponent is drawn last, so exclude columns it covers; only referee pixels to its
+      // left are guaranteed visible. This keeps the assertion about the referee alone.
+      const oppDraw = computeOpponentDraw(
+        f.opponentId,
+        f.opponent.action,
+        f.opponent.actionFrame || 0,
+        f.frame,
+        f.opponent.lastHitSide,
+        f.opponent.lastHitTarget
+      );
+      const oppLeft = oppDraw.x + shakeX;
+
+      const refSprite = REFEREE_SPRITES.COUNT;
+      let shiftedMatches = 0;
+      let unshiftedMatches = 0;
+      for (let sy = 0; sy < refSprite.height; sy++) {
+        const row = refSprite.rows[sy];
+        for (let sx = 0; sx < refSprite.width; sx++) {
+          const ch = row[sx];
+          if (ch === '.' || ch === ' ' || ch === undefined) continue;
+          const gx = 48 + sx;
+          if (gx >= oppLeft) continue; // opponent would overwrite this column
+          const [er, eg, eb] = nesToRgba(refSprite.palette[ch] ?? -1);
+          const matches = (x: number, y: number) => {
+            if (x < 0 || x >= CANVAS_WIDTH || y < 0 || y >= CANVAS_HEIGHT) return false;
+            const idx = (y * CANVAS_WIDTH + x) * 4;
+            return m.buffer[idx] === er && m.buffer[idx + 1] === eg && m.buffer[idx + 2] === eb;
+          };
+          if (matches(gx + shakeX, 88 + sy + shakeY)) shiftedMatches++;
+          if (matches(gx, 88 + sy)) unshiftedMatches++;
+        }
+      }
+
+      // The referee's opaque pixels must appear at the shaken offset, not the resting one.
+      expect(shiftedMatches, 'referee pixels appear at the shaken offset').toBeGreaterThan(20);
+      expect(
+        shiftedMatches,
+        'referee is drawn shaken, not at its resting position'
+      ).toBeGreaterThan(unshiftedMatches);
     });
   });
 });

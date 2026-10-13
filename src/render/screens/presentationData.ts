@@ -70,60 +70,66 @@ function isOpaqueChar(ch: string | undefined): boolean {
   return !!ch && ch !== '.' && ch !== ' ';
 }
 
-// Build a square portrait crop that shows the character's head:
-// the top of the crop is the sprite's first opaque row, horizontally centred
-// on the opaque pixels of the sprite's first 24 rows.
+// Build a square portrait crop that shows the character's head and shoulders:
+// - starts at the idle frame's first opaque row
+// - is at least 40% of the idle frame's opaque height (using 45% to capture head & shoulders)
+// - is horizontally centered on the head center (top 25% opaque rows center)
 export function computePortraitCrop(
   sprite: SpriteData,
-  size: number
+  _size?: number
 ): { x: number; y: number; w: number; h: number } {
   let firstOpaque = -1;
+  let lastOpaque = -1;
   for (let y = 0; y < sprite.height; y++) {
     const row = sprite.rows[y];
     if (row && row.split('').some((c) => c !== '.' && c !== ' ')) {
-      firstOpaque = y;
-      break;
+      if (firstOpaque < 0) firstOpaque = y;
+      lastOpaque = y;
     }
   }
   if (firstOpaque < 0) firstOpaque = 0;
+  if (lastOpaque < 0) lastOpaque = sprite.height - 1;
 
-  let minX = sprite.width;
-  let maxX = -1;
-  const scanRows = Math.min(sprite.height, 24);
-  for (let y = 0; y < scanRows; y++) {
-    const row = sprite.rows[y];
+  const opaqueHeight = lastOpaque - firstOpaque + 1;
+
+  // Head center: opaque pixels in the top 25% of rows
+  const topRowCount = Math.max(1, Math.floor(sprite.height * 0.25));
+  let sumX = 0;
+  let count = 0;
+  for (let r = 0; r < topRowCount; r++) {
+    const row = sprite.rows[r];
     if (!row) continue;
-    for (let x = 0; x < sprite.width; x++) {
-      const c = row[x];
-      if (c && c !== '.' && c !== ' ') {
-        if (x < minX) minX = x;
-        if (x > maxX) maxX = x;
+    for (let c = 0; c < sprite.width; c++) {
+      const ch = row[c];
+      if (ch && ch !== '.' && ch !== ' ') {
+        sumX += c;
+        count++;
       }
     }
   }
-  if (maxX < 0) {
-    minX = 0;
-    maxX = sprite.width - 1;
-  }
+  const headCenterX = count > 0 ? Math.round(sumX / count) : Math.floor(sprite.width / 2);
 
-  const centerX = Math.floor((minX + maxX) / 2);
-  let cropX = centerX - Math.floor(size / 2);
-  if (cropX < 0) cropX = 0;
-  if (cropX + size > sprite.width) cropX = Math.max(0, sprite.width - size);
+  // Crop at least 40% of opaque height (45% for full head and shoulders), square aspect ratio
+  const cropH = Math.round(0.45 * opaqueHeight);
+  const cropW = cropH;
 
+  let cropX = Math.round(headCenterX - cropW / 2);
   let cropY = firstOpaque;
-  if (cropY + size > sprite.height) cropY = Math.max(0, sprite.height - size);
 
-  return { x: cropX, y: cropY, w: size, h: size };
+  if (cropX < 0) cropX = 0;
+  if (cropX + cropW > sprite.width) cropX = Math.max(0, sprite.width - cropW);
+  if (cropY + cropH > sprite.height) cropY = Math.max(0, sprite.height - cropH);
+
+  return { x: cropX, y: cropY, w: cropW, h: cropH };
 }
 
-// Compute the head portrait crop for an opponent at a given square size.
+// Compute the head portrait crop for an opponent.
 export function getPortraitCrop(
   oppId: string,
-  size: number
+  size?: number
 ): { x: number; y: number; w: number; h: number } {
   const info = OPPONENT_PRESENTATION[oppId];
-  if (!info) return { x: 0, y: 0, w: size, h: size };
+  if (!info) return { x: 0, y: 0, w: size || 32, h: size || 32 };
   return computePortraitCrop(info.sprite, size);
 }
 

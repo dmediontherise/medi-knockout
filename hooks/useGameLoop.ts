@@ -414,8 +414,9 @@ export const useGameLoop = () => {
               soundEngine.stopMusic();
             }
 
-            // Hit-stop freeze on landed blows / knockdowns (0 in fast/test mode)
-            const isFast = typeof window !== 'undefined' && (
+            // Hit-stop freeze on landed blows / knockdowns (0 in fast/test mode, unless hitstop=1 is specified)
+            const allowHitStop = typeof window !== 'undefined' && window.location.search.includes('hitstop=1');
+            const isFast = typeof window !== 'undefined' && !allowHitStop && (
               window.location.search.includes('skip_entrance') ||
               window.location.search.includes('test') ||
               window.location.search.includes('debug=')
@@ -521,6 +522,7 @@ export const useGameLoop = () => {
     currentOpponent,
     activeSpecial: getActiveSpecial(),
     fightState: state,
+    hitStopRemaining: hitStopCounterRef.current,
     handlePlayerInput,
     releaseBlock,
     resetGame,

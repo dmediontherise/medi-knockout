@@ -88,3 +88,47 @@ export function blitSpriteCrop(
     }
   }
 }
+
+// Blit a sub-rectangle of a sprite scaled down (or up) with nearest-neighbour
+// into a target destination rectangle of size destW x destH.
+export function blitSpriteScaled(
+  data: Uint8ClampedArray,
+  sprite: SpriteData,
+  destX: number,
+  destY: number,
+  destW: number,
+  destH: number,
+  srcX: number,
+  srcY: number,
+  srcW: number,
+  srcH: number
+) {
+  for (let dy = 0; dy < destH; dy++) {
+    const py = destY + dy;
+    if (py < 0 || py >= CANVAS_HEIGHT) continue;
+    const sy = srcY + Math.floor((dy * srcH) / destH);
+    if (sy < 0 || sy >= sprite.height) continue;
+    const row = sprite.rows[sy];
+    if (!row) continue;
+
+    for (let dx = 0; dx < destW; dx++) {
+      const px = destX + dx;
+      if (px < 0 || px >= CANVAS_WIDTH) continue;
+      const sx = srcX + Math.floor((dx * srcW) / destW);
+      if (sx < 0 || sx >= sprite.width) continue;
+
+      const char = row[sx];
+      if (char === '.' || char === ' ') continue;
+
+      const nesColor = sprite.palette[char] ?? -1;
+      if (nesColor < 0) continue;
+
+      const [r, g, b] = nesToRgba(nesColor);
+      const idx = (py * CANVAS_WIDTH + px) * 4;
+      data[idx] = r;
+      data[idx + 1] = g;
+      data[idx + 2] = b;
+      data[idx + 3] = 255;
+    }
+  }
+}

@@ -33,8 +33,16 @@ for (const opponentId of OPPONENT_IDS) {
         { timeout: 15000 }
       );
 
-      // Wait for the round clock to advance >= 1s
-      await page.waitForTimeout(1200);
+      // Wait for the round clock to advance >= 1s (observable state)
+      await page.waitForFunction(
+        () => {
+          const el = document.querySelector('[data-game-clock]');
+          const clock = el?.getAttribute('data-game-clock');
+          return clock !== null && clock !== undefined && parseInt(clock, 10) >= 1;
+        },
+        null,
+        { timeout: 10000 }
+      );
 
       // Verify the canvas is visible
       const canvas = page.locator('canvas.game-canvas');
@@ -104,3 +112,49 @@ for (const opponentId of OPPONENT_IDS) {
     expect(pageErrors).toHaveLength(0);
   });
 }
+
+// Requirement 6 (M1): E2E with ?debug=lowhp&opp=aint_man&hitstop=1 reads data-hitstop and observes it > 0 after landed punch
+test('hit-stop freeze is active and observable via data-hitstop in ?debug=lowhp&opp=aint_man&hitstop=1', async ({ page }) => {
+  const pageErrors: Error[] = [];
+  page.on('pageerror', (err) => pageErrors.push(err));
+
+  await page.goto('./?debug=lowhp&opp=aint_man&hitstop=1');
+  const canvas = page.locator('canvas.game-canvas');
+  await expect(canvas).toBeVisible();
+
+  // Wait until PLAYING
+  await page.waitForFunction(
+    () => document.querySelector('[data-game-state]')?.getAttribute('data-game-state') === 'PLAYING',
+    null,
+    { timeout: 15000 }
+  );
+
+  // Hold HEAD so KeyZ is a head punch: debug=lowhp gives the opponent a LOW guard,
+  // so head punches land on an idle opponent (a body punch would be blocked and never
+  // trigger hit-stop). Poll data-hitstop while mashing instead of a fixed wait count.
+  // Only press while PLAYING so a punch key never dismisses a result screen.
+  await page.keyboard.down('ArrowUp');
+  try {
+    await expect
+      .poll(
+        async () => {
+          const gameState = await page.evaluate(() =>
+            document.querySelector('[data-game-state]')?.getAttribute('data-game-state')
+          );
+          if (gameState === 'PLAYING') {
+            await page.keyboard.press('KeyZ');
+          }
+          return page.evaluate(() => {
+            const el = document.querySelector('[data-hitstop]');
+            return el ? parseInt(el.getAttribute('data-hitstop') || '0', 10) : 0;
+          });
+        },
+        { timeout: 20000, intervals: [50, 80, 120, 160] }
+      )
+      .toBeGreaterThan(0);
+  } finally {
+    await page.keyboard.up('ArrowUp');
+  }
+
+  expect(pageErrors).toHaveLength(0);
+});

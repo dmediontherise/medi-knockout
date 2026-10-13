@@ -909,5 +909,43 @@ describe('R10 characters and specials preserved', () => {
         }
       }
     });
+
+    it('Task 016 Requirement 6 (M2): step() sets opponent.lastHitSide and lastHitTarget on landed head and body hits', () => {
+      // 1. Left head punch lands on opponent
+      let fightHead = createFight('aint_man', 42);
+      fightHead.phase = 'ROUND_ACTIVE';
+      fightHead.opponent.action = 'IDLE';
+      fightHead.opponent.guard = 'LOW'; // Low guard so head punch lands
+
+      let landedHead = false;
+      for (let i = 0; i < 20; i++) {
+        fightHead = step(fightHead, i === 0 ? { punchLeftHead: true } : {});
+        if (fightHead.opponent.action === 'HIT') {
+          landedHead = true;
+          expect(fightHead.opponent.lastHitSide, 'lastHitSide is LEFT for left head punch').toBe('LEFT');
+          expect(fightHead.opponent.lastHitTarget, 'lastHitTarget is HEAD for left head punch').toBe('HEAD');
+          break;
+        }
+      }
+      expect(landedHead, 'left head punch landed').toBe(true);
+
+      // 2. Right body punch lands on opponent
+      let fightBody = createFight('aint_man', 42);
+      fightBody.phase = 'ROUND_ACTIVE';
+      fightBody.opponent.action = 'IDLE';
+      fightBody.opponent.guard = 'HIGH'; // High guard so body punch lands
+
+      let landedBody = false;
+      for (let i = 0; i < 20; i++) {
+        fightBody = step(fightBody, i === 0 ? { punchRightBody: true } : {});
+        if (fightBody.opponent.action === 'HIT') {
+          landedBody = true;
+          expect(fightBody.opponent.lastHitSide, 'lastHitSide is RIGHT for right body punch').toBe('RIGHT');
+          expect(fightBody.opponent.lastHitTarget, 'lastHitTarget is BODY for right body punch').toBe('BODY');
+          break;
+        }
+      }
+      expect(landedBody, 'right body punch landed').toBe(true);
+    });
   });
 });
