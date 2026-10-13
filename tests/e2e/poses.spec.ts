@@ -310,6 +310,28 @@ test.describe('Pose Preview and Contact Sheets Suite', () => {
       expect(topRow30, `${oppId} KO frame 30 has opponent`).toBeGreaterThan(0);
       expect(topRow30 - topRow0, `${oppId} moves down by >= 30 px between frame 0 and 30`).toBeGreaterThanOrEqual(30);
 
+      // Requirement 12: the opponent is clipped at the ring floor line (y = 190) and
+      // never slides past it. At frames 30 and 40 no opponent pixel may lie below it.
+      const FLOOR_LINE = 190;
+      function countPixelsBelowFloor(img: any): number {
+        let count = 0;
+        for (let y = FLOOR_LINE; y < 240; y++) {
+          for (let x = 0; x < 256; x++) {
+            if (img.getPixelColor(x, y) !== emptyFrame.getPixelColor(x, y)) {
+              count++;
+            }
+          }
+        }
+        return count;
+      }
+
+      for (const n of [30, 40]) {
+        expect(
+          countPixelsBelowFloor(frameImages[n]),
+          `${oppId} KO frame ${n} draws no opponent pixels below floor line y=${FLOOR_LINE}`
+        ).toBe(0);
+      }
+
       // Assert KO sprite is absent in exactly one of frames 40 and 44 (blink)
       function countSpritePixelsVsEmpty(img: any): number {
         let count = 0;

@@ -106,7 +106,7 @@ export const useGameLoop = () => {
   const accumulatorRef = useRef<number>(0);
   const lastTimeRef = useRef<number | null>(null);
 
-  // Auto-start match if ?debug=lowhp is provided on mount
+  // Auto-start match if ?debug=lowhp or ?debug=betweenrounds is provided on mount
   useEffect(() => {
     if (typeof window === 'undefined') return;
     const params = new URLSearchParams(window.location.search);
@@ -114,6 +114,19 @@ export const useGameLoop = () => {
     const oppParam = params.get('opp');
     if (debug === 'lowhp') {
       resetGame(oppParam || 'aint_man');
+    } else if (debug === 'betweenrounds') {
+      const oppId = oppParam || 'aint_man';
+      const foundIdx = ROSTER.findIndex((r) => r.id === oppId);
+      const nextIdx = foundIdx !== -1 ? foundIdx : 0;
+      setOpponentIndex(nextIdx);
+      const fight = createFight(oppId, 12345);
+      fight.phase = 'BETWEEN_ROUNDS';
+      fight.round = 1;
+      fight.player.hp = Math.floor(fight.player.maxHp * 0.7);
+      fight.opponent.hp = Math.floor(fight.opponent.maxHp * 0.6);
+      fight.player.points = 12500;
+      engineStateRef.current = fight;
+      setGameState(GameState.PLAYING); // handled as between rounds
     }
   }, []);
 
@@ -206,6 +219,7 @@ export const useGameLoop = () => {
       const params = new URLSearchParams(window.location.search);
       if (params.get('debug') === 'lowhp') {
         fight.opponent.hp = 1;
+        fight.opponent.guard = 'LOW';
       }
     }
 
@@ -227,8 +241,8 @@ export const useGameLoop = () => {
       window.location.search.includes('debug=')
     );
 
-    // Entrance lasts 240 frames (~4.0s), or 1 frame in fast/test mode
-    transitionTimerRef.current = isFast ? 1 : 240;
+    // Entrance lasts 180 frames (~3.0s), or 1 frame in fast/test mode
+    transitionTimerRef.current = isFast ? 1 : 180;
     nextTransitionStateRef.current = GameState.ROUND_START;
   };
 
@@ -327,6 +341,7 @@ export const useGameLoop = () => {
               setFeedbackMessage('FIGHT!');
               feedbackTimerRef.current = 60;
               soundEngine.playFight();
+              soundEngine.playFightTheme();
             }
           }
         }
@@ -347,6 +362,15 @@ export const useGameLoop = () => {
           const nextState = step(prevState, input);
           engineStateRef.current = nextState;
 
+          // Stop fight theme on knockdown, round end (BETWEEN_ROUNDS), or match over
+          if (
+            nextState.phase === 'KNOCKDOWN_COUNT' ||
+            nextState.phase === 'BETWEEN_ROUNDS' ||
+            nextState.phase === 'MATCH_OVER'
+          ) {
+            soundEngine.stopMusic();
+          }
+
           // Process sound and feedback events
           if (nextState.events.length > 0) {
             dispatchAudioEvents(nextState.events, nextState);
@@ -358,13 +382,16 @@ export const useGameLoop = () => {
           }
 
           // Check match conclusion
-          if (nextState.phase === 'MATCH_OVER') {
+          if (nextState.phase === 'MATCH_OVER' && prevState.phase !== 'MATCH_OVER') {
+            soundEngine.stopMusic();
             if (nextState.winner === 'PLAYER') {
               transitionTimerRef.current = 60;
               nextTransitionStateRef.current = GameState.VICTORY;
+              soundEngine.playVictoryJingle();
             } else {
               transitionTimerRef.current = 60;
               nextTransitionStateRef.current = GameState.GAME_OVER;
+              soundEngine.playDefeatJingle();
             }
           }
         }
@@ -411,8 +438,26 @@ export const useGameLoop = () => {
     return null;
   };
 
+  const advanceRound = useCallback(() => {
+    const next = { ...engineStateRef.current };
+    next.round++;
+    next.phase = 'ROUND_ACTIVE';
+    next.roundFrame = 0;
+    next.gameClockSeconds = 180;
+    next.player.knockdownsThisRound = 0;
+    next.opponent.knockdownsThisRound = 0;
+    const healed = Math.floor(next.player.maxHp * 0.35);
+    next.player.hp = Math.min(next.player.maxHp, next.player.hp + healed);
+    next.player.hearts = next.player.maxHearts;
+    next.player.isExhausted = false;
+    engineStateRef.current = next;
+    setGameState(GameState.PLAYING);
+  }, []);
+
   return {
     gameState,
+    setGameState,
+    advanceRound,
     playerStats,
     opponentStats,
     playerState,

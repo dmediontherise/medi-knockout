@@ -19,11 +19,13 @@ function blitSprite(
   sprite: SpriteData,
   destX: number,
   destY: number,
-  overrideColor?: number
+  overrideColor?: number,
+  clipMaxY?: number
 ) {
   for (let sy = 0; sy < sprite.height; sy++) {
     const py = destY + sy;
     if (py < 0 || py >= CANVAS_HEIGHT) continue;
+    if (clipMaxY !== undefined && py >= clipMaxY) continue;
     const row = sprite.rows[sy];
     if (!row) continue;
 
@@ -233,7 +235,8 @@ export function renderFrame(
   if (!isKoHidden) {
     // Star opportunity flash effect on opponent
     const oppOverride = (state.opponent.starOpportunity && flash) ? 0x20 : undefined;
-    blitSprite(data, oppSprite, oppX, oppY, oppOverride);
+    // Opponent is clipped at ring floor line (y < 190) per Requirement 12
+    blitSprite(data, oppSprite, oppX, oppY, oppOverride, 190);
 
     // Opponent Effect Sprites (spark / stars)
     if (oppTransform.effect === 'spark-head') {

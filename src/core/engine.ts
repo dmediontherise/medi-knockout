@@ -68,7 +68,7 @@ export function createFight(opponentId: string, seed: number): FightState {
       starOpportunity: false,
       knockdownsThisRound: 0,
       totalKnockdowns: 0,
-      aiQueue: [],
+      aiQueue: ['TAUNT'],
       aiWaitFrames: 45, // brief delay before first attack
       patternIndex: 0,
       lastTellAttack: null,
@@ -472,12 +472,27 @@ export function step(state: FightState, input: InputFrame): FightState {
           const comboIdx = Math.floor(randVal * spec.combos.length);
           next.opponent.aiQueue = [...spec.combos[comboIdx]];
         }
+
+        // Taunt requirement: opponent emits TAUNT at least once per round
+        // Append TAUNT after combo with 30% chance or if time in round is passing and no taunt yet
+        const rngTaunt = nextRandom(next.seed);
+        next.seed = rngTaunt.nextSeed;
+        if (rngTaunt.value < 0.35 || next.roundFrame > 300) {
+          if (!next.opponent.aiQueue.includes('TAUNT')) {
+            next.opponent.aiQueue.push('TAUNT');
+          }
+        }
       }
 
       // Dequeue next move
       const nextMove = next.opponent.aiQueue.shift();
       if (nextMove) {
-        if (nextMove.startsWith('BLOCK_')) {
+        if (nextMove === 'TAUNT') {
+          next.opponent.action = 'TAUNT';
+          next.opponent.actionDuration = 45; // <= 60 frames
+          next.opponent.actionFrame = 0;
+          next.opponent.starOpportunity = true;
+        } else if (nextMove.startsWith('BLOCK_')) {
           next.opponent.action = nextMove as OpponentActionType;
           next.opponent.actionDuration = OPPONENT_DURATIONS.BLOCK;
           next.opponent.actionFrame = 0;
@@ -526,7 +541,9 @@ export function step(state: FightState, input: InputFrame): FightState {
       const oppAction = next.opponent.action;
       const oppFrame = next.opponent.actionFrame;
       const isTell = oppAction.startsWith('TELL_');
-      const isRecovery = oppAction.startsWith('PUNCH_') && oppFrame > OPPONENT_ATTACKS[parseAttack(oppAction)!.type].activeFrames;
+      const isRecovery =
+        oppAction === 'TAUNT' ||
+        (oppAction.startsWith('PUNCH_') && oppFrame > OPPONENT_ATTACKS[parseAttack(oppAction)!.type].activeFrames);
       const isStunned = oppAction === 'STUNNED';
       const isBlocked =
         (oppAction === 'BLOCK_HIGH' && isHead) ||

@@ -743,4 +743,41 @@ describe('R10 characters and specials preserved', () => {
 
     expect(triggered).toBe(true);
   });
+
+  describe('Opponent TAUNT emission and punishability (Task 009 Req 12)', () => {
+    const rosterIds = ['aint_man', 'medi_jinx', 'dj_tito', 'mr_yankee', 'maga_man'] as const;
+
+    it.each(rosterIds)('opponent %s emits TAUNT within a round and lasts <= 60 frames', (oppId) => {
+      let state = createFight(oppId, 42);
+      let sawTaunt = false;
+      let tauntDuration = 0;
+
+      for (let f = 0; f < 1000; f++) {
+        state = step(state, {});
+        if (state.opponent.action === 'TAUNT') {
+          sawTaunt = true;
+          tauntDuration = state.opponent.actionDuration;
+          break;
+        }
+      }
+
+      expect(sawTaunt).toBe(true);
+      expect(tauntDuration).toBeLessThanOrEqual(60);
+    });
+
+    it('TAUNT is punishable like recovery and grants counter hit / stun', () => {
+      let state = createFight('aint_man', 42);
+      state.opponent.action = 'TAUNT';
+      state.opponent.actionDuration = 45;
+      state.opponent.actionFrame = 10;
+      const initialHp = state.opponent.hp;
+
+      // Player punches opponent during TAUNT
+      state = step(state, { punchLeftHead: true });
+
+      expect(state.events).toContain('COUNTER');
+      expect(state.opponent.action).toBe('STUNNED');
+      expect(state.opponent.hp).toBeLessThan(initialHp);
+    });
+  });
 });

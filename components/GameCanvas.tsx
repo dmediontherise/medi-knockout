@@ -1,19 +1,46 @@
 import React, { useRef, useEffect, useState } from 'react';
 import { FightState } from '../src/core/types';
+import { GameState } from '../types';
 import { renderFrame, CANVAS_WIDTH, CANVAS_HEIGHT } from '../src/render/renderFrame';
+import { renderTitleScreen } from '../src/render/screens/title';
+import { renderCircuitScreen } from '../src/render/screens/circuit';
+import { renderIntroScreen } from '../src/render/screens/intro';
+import { renderBetweenRoundsScreen } from '../src/render/screens/betweenRounds';
+import { renderResultsScreen } from '../src/render/screens/results';
+
+export type ScreenMode =
+  | 'TITLE'
+  | 'CIRCUIT'
+  | 'INTRO'
+  | 'BETWEEN_ROUNDS'
+  | 'FIGHT'
+  | 'RESULTS';
 
 interface GameCanvasProps {
   state: FightState;
+  screenMode: ScreenMode;
+  circuitSelectedIndex?: number;
+  unlockedIndex?: number;
+  unlockAll?: boolean;
+  frame?: number;
   className?: string;
   isPosePreview?: boolean;
 }
 
-export const GameCanvas: React.FC<GameCanvasProps> = ({ state, className = '', isPosePreview = false }) => {
+export const GameCanvas: React.FC<GameCanvasProps> = ({
+  state,
+  screenMode,
+  circuitSelectedIndex = 0,
+  unlockedIndex = 0,
+  unlockAll = false,
+  frame = 0,
+  className = '',
+  isPosePreview = false,
+}) => {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const containerRef = useRef<HTMLDivElement | null>(null);
   const [scaleFactor, setScaleFactor] = useState<number>(1);
 
-  // Compute integer scale factor k >= 1 based on container's available width and height
   useEffect(() => {
     const updateScale = () => {
       const container = containerRef.current;
@@ -40,11 +67,35 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({ state, className = '', i
     const ctx = canvas.getContext('2d', { alpha: false });
     if (!ctx) return;
 
-    // Crisp pixel rendering without anti-aliasing
     ctx.imageSmoothingEnabled = false;
 
-    renderFrame(ctx, state);
-  }, [state]);
+    if (isPosePreview) {
+      renderFrame(ctx, state);
+      return;
+    }
+
+    switch (screenMode) {
+      case 'TITLE':
+        renderTitleScreen(ctx, frame);
+        break;
+      case 'CIRCUIT':
+        renderCircuitScreen(ctx, circuitSelectedIndex, unlockedIndex, unlockAll, frame);
+        break;
+      case 'INTRO':
+        renderIntroScreen(ctx, state.opponentId, frame);
+        break;
+      case 'BETWEEN_ROUNDS':
+        renderBetweenRoundsScreen(ctx, state, frame);
+        break;
+      case 'RESULTS':
+        renderResultsScreen(ctx, state, frame);
+        break;
+      case 'FIGHT':
+      default:
+        renderFrame(ctx, state);
+        break;
+    }
+  }, [state, screenMode, circuitSelectedIndex, unlockedIndex, unlockAll, frame, isPosePreview]);
 
   const cssWidth = CANVAS_WIDTH * scaleFactor;
   const cssHeight = CANVAS_HEIGHT * scaleFactor;

@@ -39,21 +39,19 @@ test.describe('Real knockdown in play', () => {
       }
     }
 
-    // If count attribute is still 0, wait a few frames for referee count to increment
-    if (!knockedDown) {
-      await page.waitForFunction(
-        () => {
-          const el = document.querySelector('[data-game-state]');
-          const count = el?.getAttribute('data-referee-count');
-          return count && parseInt(count, 10) > 0;
-        },
-        null,
-        { timeout: 5000 }
-      );
-    }
+    // Wait until referee count reaches at least 2
+    await page.waitForFunction(
+      () => {
+        const el = document.querySelector('[data-game-state]');
+        const count = el?.getAttribute('data-referee-count');
+        return count && parseInt(count, 10) >= 2;
+      },
+      null,
+      { timeout: 10000 }
+    );
 
     // Wait a brief moment for referee count digit to be clearly visible on canvas
-    await page.waitForTimeout(300);
+    await page.waitForTimeout(100);
 
     const screenshotsDir = path.resolve(process.cwd(), 'screenshots');
     if (!fs.existsSync(screenshotsDir)) {
@@ -65,5 +63,48 @@ test.describe('Real knockdown in play', () => {
 
     expect(fs.existsSync(screenshotPath)).toBe(true);
     expect(pageErrors).toHaveLength(0);
+
+    // Read the screenshot and verify count digit pixels and opponent in fallen position
+    const { Jimp } = await import('jimp');
+    const img = await Jimp.read(screenshotPath);
+    if (img.bitmap.width !== 256 || img.bitmap.height !== 240) {
+      img.resize({ w: 256, h: 240 });
+    }
+
+    // 1. Assert count digits are drawn (non-background pixels in count area y: 52..76, x: 100..156)
+    let countDigitPixels = 0;
+    for (let y = 56; y <= 72; y++) {
+      for (let x = 110; x <= 146; x++) {
+        const p = img.getPixelColor(x, y);
+        const r = (p >> 24) & 0xff;
+        const g = (p >> 16) & 0xff;
+        const b = (p >> 8) & 0xff;
+        // The count digit is drawn in gold/yellow (0x28) or white (0x20)
+        // Background bar is pure black (0,0,0)
+        if (r > 100 || g > 100) {
+          countDigitPixels++;
+        }
+      }
+    }
+    expect(countDigitPixels, 'Count digit pixels should be visible in message bar area').toBeGreaterThan(10);
+
+    // 2. Assert opponent is in fallen position (opponent sprite shifted down onto the canvas mat)
+    // Floor boundary is y = 190. Fallen opponent pixels should be between y = 130 and 190
+    let fallenOpponentPixels = 0;
+    for (let y = 130; y < 190; y++) {
+      for (let x = 60; x < 196; x++) {
+        const p = img.getPixelColor(x, y);
+        const r = (p >> 24) & 0xff;
+        const g = (p >> 16) & 0xff;
+        const b = (p >> 8) & 0xff;
+        const isMat = (r === 0 && g === 136 && b === 136) || (r === 0 && g === 147 && b === 147);
+        const isBlack = (r === 0 && g === 0 && b === 0);
+        const isRope = (r === 181 && g === 49 && b === 32) || (r === 254 && g === 254 && b === 254) || (r === 0 && g === 30 && b === 116);
+        if (!isMat && !isBlack && !isRope) {
+          fallenOpponentPixels++;
+        }
+      }
+    }
+    expect(fallenOpponentPixels, 'Opponent should have pixels visible in fallen ring mat position').toBeGreaterThan(50);
   });
 });
