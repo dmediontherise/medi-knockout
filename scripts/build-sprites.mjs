@@ -206,48 +206,6 @@ async function processSpriteImage(img, box, targetW, targetH, charId) {
   return { width: targetW, height: targetH, palette: paletteMap, rows };
 }
 
-// Find connected figures in image sheet
-async function detectSheetFigures(img) {
-  const w = img.bitmap.width;
-  const h = img.bitmap.height;
-  const isContent = (x, y) => {
-    if (x <= 1 || x >= w - 2 || y <= 1 || y >= h - 2) return false;
-    const idx = (y * w + x) * 4;
-    return img.bitmap.data[idx] < 225 || img.bitmap.data[idx + 1] < 225 || img.bitmap.data[idx + 2] < 225;
-  };
-  const visited = new Uint8Array(w * h);
-  const figs = [];
-  for (let y = 2; y < h - 2; y++) {
-    for (let x = 2; x < w - 2; x++) {
-      if (isContent(x, y) && !visited[y * w + x]) {
-        let minX = x, maxX = x, minY = y, maxY = y, count = 0;
-        const q = [[x, y]];
-        visited[y * w + x] = 1;
-        while (q.length > 0) {
-          const [cx, cy] = q.pop();
-          count++;
-          if (cx < minX) minX = cx;
-          if (cx > maxX) maxX = cx;
-          if (cy < minY) minY = cy;
-          if (cy > maxY) maxY = cy;
-          for (const [dx, dy] of [[-1, 0], [1, 0], [0, -1], [0, 1]]) {
-            const nx = cx + dx, ny = cy + dy;
-            if (nx >= 2 && nx < w - 2 && ny >= 2 && ny < h - 2 && !visited[ny * w + nx] && isContent(nx, ny)) {
-              visited[ny * w + nx] = 1;
-              q.push([nx, ny]);
-            }
-          }
-        }
-        if (count > 500) {
-          figs.push({ x: minX, y: minY, w: maxX - minX + 1, h: maxY - minY + 1, count });
-        }
-      }
-    }
-  }
-  figs.sort((a, b) => Math.floor(a.y / 90) * 1000 + a.x - (Math.floor(b.y / 90) * 1000 + b.x));
-  return figs;
-}
-
 async function buildAllSprites() {
   const spriteMapConfig = {};
 
@@ -258,84 +216,13 @@ async function buildAllSprites() {
       img = img.crop(charConfig.crop);
     }
 
-    // 1. Process Idle base
+    // Process clean Idle base frame
     const idleSprite = await processSpriteImage(img, charConfig.figBox, charConfig.targetW, charConfig.targetH, charConfig.id);
 
-    // Export sprite data file
-    let extraExports = '';
-
-    if (charConfig.id !== 'player') {
-      const sheetFigures = await detectSheetFigures(img);
-      // Map sheet figures:
-      // aint_man: 15 figs. hit: 8, stunned: 9, kd: 14, taunt: 12
-      // medi_jinx: 11 figs. hit: 6, stunned: 7, kd: 9, taunt: 10
-      // dj_tito: 12 figs. hit: 7, stunned: 8, kd: 10, taunt: 11
-      // mr_yankee: 11 figs. hit: 6, stunned: 7, kd: 10, taunt: 9
-      // maga_man: 11 figs. hit: 6, stunned: 7, kd: 10, taunt: 9
-      const figureMapIndices = {
-        aint_man: { hit: 8, stunned: 9, knocked_down: 14, taunt: 12 },
-        medi_jinx: { hit: 6, stunned: 7, knocked_down: 9, taunt: 10 },
-        dj_tito: { hit: 7, stunned: 8, knocked_down: 10, taunt: 11 },
-        mr_yankee: { hit: 6, stunned: 7, knocked_down: 10, taunt: 9 },
-        maga_man: { hit: 6, stunned: 7, knocked_down: 10, taunt: 9 },
-      }[charConfig.id];
-
-      spriteMapConfig[charConfig.id] = {
-        sheet: charConfig.file,
-        totalFiguresDetected: sheetFigures.length,
-        idleFigureIndex: 0,
-        ...figureMapIndices
-      };
-
-      // Generate extra pose sprites: Hit, Stunned, KnockedDown, Taunt
-      const hitBox = sheetFigures[figureMapIndices.hit];
-      const stunnedBox = sheetFigures[figureMapIndices.stunned];
-      const kdBox = sheetFigures[figureMapIndices.knocked_down];
-      const tauntBox = sheetFigures[figureMapIndices.taunt];
-
-      const hitSprite = await processSpriteImage(img, hitBox, charConfig.targetW, charConfig.targetH, charConfig.id);
-      const stunnedSprite = await processSpriteImage(img, stunnedBox, charConfig.targetW, charConfig.targetH, charConfig.id);
-      const kdSprite = await processSpriteImage(img, kdBox, charConfig.targetW, charConfig.targetH, charConfig.id);
-      const tauntSprite = await processSpriteImage(img, tauntBox, charConfig.targetW, charConfig.targetH, charConfig.id);
-
-      extraExports = `
-export const HIT_BASE_${charConfig.id.toUpperCase()}: SpriteData = {
-  width: ${hitSprite.width},
-  height: ${hitSprite.height},
-  palette: ${JSON.stringify(hitSprite.palette, null, 2)},
-  rows: [
-${hitSprite.rows.map(r => `    ${JSON.stringify(r)},`).join('\n')}
-  ],
-};
-
-export const STUNNED_BASE_${charConfig.id.toUpperCase()}: SpriteData = {
-  width: ${stunnedSprite.width},
-  height: ${stunnedSprite.height},
-  palette: ${JSON.stringify(stunnedSprite.palette, null, 2)},
-  rows: [
-${stunnedSprite.rows.map(r => `    ${JSON.stringify(r)},`).join('\n')}
-  ],
-};
-
-export const KD_BASE_${charConfig.id.toUpperCase()}: SpriteData = {
-  width: ${kdSprite.width},
-  height: ${kdSprite.height},
-  palette: ${JSON.stringify(kdSprite.palette, null, 2)},
-  rows: [
-${kdSprite.rows.map(r => `    ${JSON.stringify(r)},`).join('\n')}
-  ],
-};
-
-export const TAUNT_BASE_${charConfig.id.toUpperCase()}: SpriteData = {
-  width: ${tauntSprite.width},
-  height: ${tauntSprite.height},
-  palette: ${JSON.stringify(tauntSprite.palette, null, 2)},
-  rows: [
-${tauntSprite.rows.map(r => `    ${JSON.stringify(r)},`).join('\n')}
-  ],
-};
-`;
-    }
+    spriteMapConfig[charConfig.id] = {
+      sheet: charConfig.file,
+      idleFigureIndex: 0,
+    };
 
     const content = `import { SpriteData } from '../types';
 
@@ -347,14 +234,13 @@ export const IDLE_BASE_${charConfig.id.toUpperCase()}: SpriteData = {
 ${idleSprite.rows.map(r => `    ${JSON.stringify(r)},`).join('\n')}
   ],
 };
-${extraExports}`;
+`;
 
     const outPath = path.join(OUT_DIR, `${charConfig.id}.ts`);
     fs.writeFileSync(outPath, content, 'utf8');
     console.log(`Wrote ${outPath}`);
   }
 
-  // Write scripts/sprite-map.json per requirement 4
   const mapPath = 'scripts/sprite-map.json';
   fs.writeFileSync(mapPath, JSON.stringify(spriteMapConfig, null, 2), 'utf8');
   console.log(`Wrote ${mapPath}`);

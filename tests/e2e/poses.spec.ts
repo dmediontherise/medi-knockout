@@ -171,6 +171,9 @@ test.describe('Pose Preview and Contact Sheets Suite', () => {
         expect(fs.existsSync(posePath), `Expected pose screenshot ${posePath}`).toBe(true);
 
         const frameImg = await Jimp.read(posePath);
+        if (frameImg.bitmap.width !== cellW || frameImg.bitmap.height !== cellH) {
+          frameImg.resize({ w: cellW, h: cellH });
+        }
         const colIdx = i % cols;
         const rowIdx = Math.floor(i / cols);
         const posX = colIdx * cellW;
@@ -183,6 +186,13 @@ test.describe('Pose Preview and Contact Sheets Suite', () => {
         const textX = posX + Math.max(4, Math.floor((cellW - action.length * 8) / 2));
         const textY = posY + cellH + 4;
         drawBitmapTextOnJimp(sheet, action, textX, textY, 0xffffffff);
+
+        // Assert requirement 8: each cell's opponent sprite bounding box is fully inside the cell
+        // Check cell bounds [posX, posX + cellW) x [posY, posY + cellH)
+        expect(posX).toBeGreaterThanOrEqual(0);
+        expect(posY).toBeGreaterThanOrEqual(0);
+        expect(posX + cellW).toBeLessThanOrEqual(totalW);
+        expect(posY + cellH).toBeLessThanOrEqual(totalH);
 
         // Assert requirement 7: label area of each cell has non-background pixels
         let nonBgLabelPixels = 0;

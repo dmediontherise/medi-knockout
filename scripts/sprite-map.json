@@ -1,47 +1,26 @@
 {
   "aint_man": {
     "sheet": "public/assets/aint_man.jpg",
-    "totalFiguresDetected": 15,
-    "idleFigureIndex": 0,
-    "hit": 8,
-    "stunned": 9,
-    "knocked_down": 14,
-    "taunt": 12
+    "idleFigureIndex": 0
   },
   "medi_jinx": {
     "sheet": "public/assets/medi_jinx.jpg",
-    "totalFiguresDetected": 11,
-    "idleFigureIndex": 0,
-    "hit": 6,
-    "stunned": 7,
-    "knocked_down": 9,
-    "taunt": 10
+    "idleFigureIndex": 0
   },
   "dj_tito": {
     "sheet": "public/assets/dj_tito.jpg",
-    "totalFiguresDetected": 12,
-    "idleFigureIndex": 0,
-    "hit": 7,
-    "stunned": 8,
-    "knocked_down": 10,
-    "taunt": 11
+    "idleFigureIndex": 0
   },
   "mr_yankee": {
     "sheet": "public/assets/mr_yankee.jpg",
-    "totalFiguresDetected": 11,
-    "idleFigureIndex": 0,
-    "hit": 6,
-    "stunned": 7,
-    "knocked_down": 10,
-    "taunt": 9
+    "idleFigureIndex": 0
   },
   "maga_man": {
     "sheet": "public/assets/maga_man.jpg",
-    "totalFiguresDetected": 11,
-    "idleFigureIndex": 0,
-    "hit": 6,
-    "stunned": 7,
-    "knocked_down": 10,
-    "taunt": 9
+    "idleFigureIndex": 0
+  },
+  "player": {
+    "sheet": "public/assets/player_sprites_raw.jpg",
+    "idleFigureIndex": 0
   }
 }

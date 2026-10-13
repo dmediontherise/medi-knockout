@@ -2,9 +2,10 @@ import { FightState } from '../core/types';
 import { NES_PALETTE, nesToRgba } from './nesPalette';
 import { drawRingBackground } from './sprites/ring';
 import { drawBitmapText } from './sprites/font';
-import { getOpponentSprite, resolvePlayerSprite } from './poses';
+import { getOpponentSprite, resolvePlayerSprite, OPPONENT_POSES, PLAYER_POSES } from './poses';
 import { REFEREE_SPRITES, getLargeCountDigitSprite } from './sprites/referee';
 import { SpriteData } from './sprites/types';
+import { SPARK_SPRITE, STAR_SPRITE } from './sprites/effects';
 
 export const CANVAS_WIDTH = 256;
 export const CANVAS_HEIGHT = 240;
@@ -179,34 +180,73 @@ export function renderFrame(
   // 4. Draw Opponent
   // Opponent sprite is 112-150px tall (e.g. 140px tall).
   // Positioned below HUD (y >= 48) at y = 50, centered at x: 128 ± 8.
+  const oppTransform = OPPONENT_POSES[state.opponent.action] || OPPONENT_POSES['IDLE'];
   const oppSprite = getOpponentSprite(state.opponentId, state.opponent.action, frame);
-  const oppX = Math.round(128 - oppSprite.width / 2);
-  const oppY = 50; // below HUD (y >= 48)
+
+  // Fall logic: slide down over ~30 frames until at most its top 40 rows remain above ring floor (y=190)
+  let fallDy = 0;
+  if (oppTransform.fall) {
+    const actFrame = state.opponent.actionFrame || 0;
+    const fallProgress = Math.min(1, actFrame / 30);
+    // 50 + 100 = 150 -> leaves top 40 rows above y=190
+    fallDy = Math.floor(fallProgress * 100);
+  }
+
+  // Shake logic
+  let oppShakeX = 0;
+  if (oppTransform.shake > 0) {
+    const period = state.opponent.action === 'STUNNED' ? 8 : 4;
+    const sign = (Math.floor(frame / (period / 2)) % 2 === 0) ? 1 : -1;
+    oppShakeX = sign * oppTransform.shake;
+  }
+
+  // Breathing offset: 1px vertical breathing on frame 30 window
+  const isBreathingFrame = Math.floor(frame / 30) % 2 === 1;
+  const breathingDy = (state.opponent.action === 'IDLE' && isBreathingFrame) ? 1 : 0;
+
+  const oppX = Math.round(128 - oppSprite.width / 2) + oppTransform.dx + oppShakeX;
+  const oppY = 50 + oppTransform.dy + fallDy + breathingDy;
 
   // Star opportunity flash effect on opponent
   const oppOverride = (state.opponent.starOpportunity && flash) ? 0x20 : undefined;
   blitSprite(data, oppSprite, oppX, oppY, oppOverride);
 
-  // 5. Draw Player (Seen from behind, small at lower center overlapping opponent's lower body)
-  // Base position centered: x = 128 - 24 = 104, y = 168 (72px tall -> y: 168..240)
-  const playerSprite = resolvePlayerSprite(state.player.action, state.player.isExhausted);
-  let playerX = Math.round(128 - playerSprite.width / 2);
-  let playerY = 168;
-
-  // Dodge shifts exactly 24px per spec
-  if (state.player.action === 'DODGE_LEFT') {
-    playerX -= 24;
-  } else if (state.player.action === 'DODGE_RIGHT') {
-    playerX += 24;
-  } else if (state.player.action === 'DUCK') {
-    playerY += 12; // Lowers 12px per spec
+  // Opponent Effect Sprites (spark / stars)
+  if (oppTransform.effect === 'spark-head') {
+    blitSprite(data, SPARK_SPRITE, oppX + Math.floor(oppSprite.width / 2) - 4, oppY + 16);
+  } else if (oppTransform.effect === 'spark-body') {
+    blitSprite(data, SPARK_SPRITE, oppX + Math.floor(oppSprite.width / 2) - 4, oppY + 50);
+  } else if (oppTransform.effect === 'stars') {
+    // Circling stars above head
+    const angle = (frame * 0.15) % (Math.PI * 2);
+    const starX = oppX + Math.floor(oppSprite.width / 2) + Math.round(Math.cos(angle) * 16) - 4;
+    const starY = oppY + Math.round(Math.sin(angle) * 6) - 8;
+    blitSprite(data, STAR_SPRITE, starX, starY);
   }
+
+  // 5. Draw Player (Seen from behind, small at lower center overlapping opponent's lower body)
+  const playerTransform = PLAYER_POSES[state.player.action] || PLAYER_POSES['IDLE'];
+  const playerSprite = resolvePlayerSprite(state.player.action, state.player.isExhausted);
+
+  let pShakeX = 0;
+  if (playerTransform.shake > 0) {
+    const sign = (Math.floor(frame / 2) % 2 === 0) ? 1 : -1;
+    pShakeX = sign * playerTransform.shake;
+  }
+
+  let pFallDy = 0;
+  if (playerTransform.fall) {
+    const pActFrame = state.player.actionFrame || 0;
+    pFallDy = Math.min(30, Math.floor(pActFrame * 1.5));
+  }
+
+  const playerX = Math.round(128 - playerSprite.width / 2) + playerTransform.dx + pShakeX;
+  const playerY = 168 + playerTransform.dy + pFallDy;
 
   blitSprite(data, playerSprite, playerX, playerY);
 
   // 6. Hit feedback flash (white/red flash on hit)
   if (state.player.action === 'HIT' && flash) {
-    // Flash player white on hit
     blitSprite(data, playerSprite, playerX, playerY, 0x20);
   }
 

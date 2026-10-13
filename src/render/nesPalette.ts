@@ -89,3 +89,28 @@ export function isNesColor(rOrIndex: number, g?: number, b?: number): boolean {
   }
   return NES_PALETTE.some(([pr, pg, pb]) => pr === rOrIndex && pg === g && pb === b);
 }
+
+// Maps every opponent color to a lighter NES entry (+0x10 within the same hue column, white stays white)
+export function toFlashPalette(colorIndex: number): number {
+  if (colorIndex < 0 || colorIndex > 63) return colorIndex;
+  // White colors in NES palette: 0x20, 0x30 stay white
+  if (colorIndex === 0x20 || colorIndex === 0x30) return colorIndex;
+  const row = Math.floor(colorIndex / 16);
+  const col = colorIndex % 16;
+  if (row < 3) {
+    return (row + 1) * 16 + col;
+  }
+  return colorIndex;
+}
+
+// Maps to a darker entry (-0x10, floor 0x0F)
+export function toDarkPalette(colorIndex: number): number {
+  if (colorIndex < 0 || colorIndex > 63) return colorIndex;
+  const row = Math.floor(colorIndex / 16);
+  const col = colorIndex % 16;
+  if (row > 0) {
+    return (row - 1) * 16 + col;
+  }
+  return 0x0f;
+}
+
