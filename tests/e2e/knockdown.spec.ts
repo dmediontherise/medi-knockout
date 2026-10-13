@@ -140,6 +140,39 @@ test.describe('Real knockdown in play', () => {
     expect(top, 'opponent is drawn (diff vs empty reference found)').toBeGreaterThan(0);
     expect(top, 'knocked-down opponent is low on the ring floor (top row >= 140)').toBeGreaterThanOrEqual(140);
 
+    // (b) The fallen opponent is drawn in his own (dark) colors, not a white silhouette.
+    // Opponent-only region: above the player (y <= 167) and below the crowd (y >= 88).
+    const white20 = nesToRgba(0x20);
+    const white30 = nesToRgba(0x30);
+    let opponentPixels = 0;
+    let whitePixels = 0;
+    for (let y = 88; y <= 167; y++) {
+      for (let x = 60; x < 196; x++) {
+        if (x >= REFEREE_BOX.x0 && x <= REFEREE_BOX.x1 && y >= REFEREE_BOX.y0 && y <= REFEREE_BOX.y1) {
+          continue;
+        }
+        const livePx = blockPx(live!, x, y, k);
+        if (same(livePx, blockPx(empty, x, y, k))) continue;
+        opponentPixels++;
+        if (same(livePx, [white20[0], white20[1], white20[2]]) || same(livePx, [white30[0], white30[1], white30[2]])) {
+          whitePixels++;
+        }
+      }
+    }
+    expect(opponentPixels, 'opponent pixels measured above the player').toBeGreaterThan(0);
+    expect(whitePixels / opponentPixels, 'fallen opponent is not a white silhouette (< 5% white)').toBeLessThan(0.05);
+
+    // (c) The player stands aside: his leftmost pixel below the ring floor is at x >= 152.
+    const mat = nesToRgba(0x19);
+    let playerLeft = -1;
+    for (let y = 190; y < 240; y++) {
+      for (let x = 0; x < 256; x++) {
+        if (same(blockPx(live!, x, y, k), [mat[0], mat[1], mat[2]])) continue;
+        if (playerLeft < 0 || x < playerLeft) playerLeft = x;
+      }
+    }
+    expect(playerLeft, 'player left edge below the floor is at x >= 152').toBeGreaterThanOrEqual(152);
+
     fs.rmSync(emptyPath, { force: true });
     expect(pageErrors).toHaveLength(0);
   });

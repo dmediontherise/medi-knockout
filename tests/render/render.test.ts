@@ -13,7 +13,7 @@ import {
 import { getPlayerSprite, PLAYER_BACK_IDLE } from '../../src/render/sprites/player';
 import { REFEREE_SPRITES, getLargeCountDigitSprite } from '../../src/render/sprites/referee';
 import { SpriteData } from '../../src/render/sprites/types';
-import { renderFrame, CANVAS_WIDTH, CANVAS_HEIGHT, COUNT_DIGIT_X, COUNT_DIGIT_Y } from '../../src/render/renderFrame';
+import { renderFrame, CANVAS_WIDTH, CANVAS_HEIGHT, COUNT_DIGIT_X, COUNT_DIGIT_Y, computePlayerDraw, isPlayerSteppingAside, PLAYER_STEP_ASIDE_MIN_X } from '../../src/render/renderFrame';
 import { nesToRgba } from '../../src/render/nesPalette';
 import {
   renderCircuitScreen,
@@ -919,4 +919,154 @@ describe('Task 010 R11: presentation text fits within x 8-248', () => {
     }
   });
 });
+
+// Task 011: the fallen opponent is visible, in his own colors, during the count
+function renderTask011(state: any): Uint8ClampedArray {
+  const b = new Uint8ClampedArray(CANVAS_WIDTH * CANVAS_HEIGHT * 4);
+  const ctx = {
+    createImageData: (w: number, h: number) => ({ width: w, height: h, data: b }),
+    putImageData: (imgData: any) => { b.set(imgData.data); },
+  } as unknown as CanvasRenderingContext2D;
+  renderFrame(ctx, state);
+  return b;
+}
+
+function countDiff(a: Uint8ClampedArray, b: Uint8ClampedArray, y0?: number, y1?: number): number {
+  let diff = 0;
+  const yStart = y0 ?? 0;
+  const yEnd = y1 ?? CANVAS_HEIGHT;
+  for (let y = yStart; y < yEnd; y++) {
+    for (let x = 0; x < CANVAS_WIDTH; x++) {
+      const i = (y * CANVAS_WIDTH + x) * 4;
+      if (a[i] !== b[i] || a[i + 1] !== b[i + 1] || a[i + 2] !== b[i + 2]) diff++;
+    }
+  }
+  return diff;
+}
+
+function leftmostBelowFloor(buf: Uint8ClampedArray, floorY = 190): number {
+  const [mr, mg, mb] = nesToRgba(0x19); // ring mat teal
+  let min = -1;
+  for (let y = floorY; y < CANVAS_HEIGHT; y++) {
+    for (let x = 0; x < CANVAS_WIDTH; x++) {
+      const i = (y * CANVAS_WIDTH + x) * 4;
+      if (buf[i] !== mr || buf[i + 1] !== mg || buf[i + 2] !== mb) {
+        if (min < 0 || x < min) min = x;
+      }
+    }
+  }
+  return min;
+}
+
+describe('Task 011 R1: no star-opportunity flash outside live play', () => {
+  function knockdownState(starOpportunity: boolean) {
+    const s: any = createFight('aint_man', 1);
+    s.phase = 'KNOCKDOWN_COUNT';
+    s.referee.downFighter = 'OPPONENT';
+    s.opponent.action = 'KNOCKED_DOWN';
+    s.opponent.actionFrame = 45;
+    s.opponent.starOpportunity = starOpportunity;
+    s.frame = 0; // flash on (Math.floor(0/8)%2 === 0)
+    return s;
+  }
+
+  it('does not white-override a KNOCKED_DOWN opponent during the count', () => {
+    const on = renderTask011(knockdownState(true));
+    const off = renderTask011(knockdownState(false));
+    expect(countDiff(on, off), 'starOpportunity must not change a fallen opponent').toBe(0);
+  });
+
+  it('still white-overrides a standing opponent during ROUND_ACTIVE', () => {
+    const on: any = createFight('aint_man', 1);
+    on.phase = 'ROUND_ACTIVE';
+    on.opponent.action = 'IDLE';
+    on.opponent.starOpportunity = true;
+    on.frame = 0;
+    const off: any = { ...on, opponent: { ...on.opponent, starOpportunity: false } };
+
+    const diff = countDiff(renderTask011(on), renderTask011(off), 88, 190);
+    expect(diff, 'star opportunity still flashes a live opponent').toBeGreaterThan(0);
+  });
+});
+
+describe('Task 011 R2: player steps aside during the opponent count', () => {
+  function knockdownState(starOpportunity: boolean): any {
+    const s: any = createFight('aint_man', 1);
+    s.phase = 'KNOCKDOWN_COUNT';
+    s.referee.downFighter = 'OPPONENT';
+    s.opponent.action = 'KNOCKED_DOWN';
+    s.opponent.actionFrame = 45;
+    s.opponent.starOpportunity = starOpportunity;
+    s.frame = 0;
+    return s;
+  }
+
+  function activeState(): any {
+    const s: any = createFight('aint_man', 1);
+    s.phase = 'ROUND_ACTIVE';
+    s.opponent.action = 'IDLE';
+    s.frame = 0;
+    return s;
+  }
+
+  it('draws the player at x >= 152 during the count and back to normal in ROUND_ACTIVE', () => {
+    expect(isPlayerSteppingAside(knockdownState(false))).toBe(true);
+    expect(isPlayerSteppingAside(activeState())).toBe(false);
+
+    const asideLeft = leftmostBelowFloor(renderTask011(knockdownState(false)));
+    const activeLeft = leftmostBelowFloor(renderTask011(activeState()));
+
+    expect(asideLeft, 'player stands aside at the right').toBeGreaterThanOrEqual(PLAYER_STEP_ASIDE_MIN_X);
+    expect(activeLeft, 'player returns to his normal position').toBeLessThan(PLAYER_STEP_ASIDE_MIN_X);
+    expect(asideLeft - activeLeft, 'shift is at least 64px').toBeGreaterThanOrEqual(64);
+  });
+});
+
+describe('Task 011 R3: fallen opponent visible in the y140-189 band', () => {
+  it('draws >= 600 opponent pixels in the band and >= 60% are not covered by the player', () => {
+    const withOpp: any = createFight('aint_man', 1);
+    withOpp.phase = 'KNOCKDOWN_COUNT';
+    withOpp.referee.downFighter = 'OPPONENT';
+    withOpp.opponent.action = 'KNOCKED_DOWN';
+    withOpp.opponent.actionFrame = 45;
+    withOpp.opponent.starOpportunity = false;
+    withOpp.frame = 0;
+
+    // Same scene with the opponent hidden (KO blink-off window) -> renders the player and ring only.
+    const withoutOpp: any = {
+      ...withOpp,
+      opponent: { ...withOpp.opponent, action: 'KO', actionFrame: 35 },
+    };
+
+    const bufWith = renderTask011(withOpp);
+    const bufWithout = renderTask011(withoutOpp);
+
+    const sprite = getOpponentSprite('aint_man', 'KNOCKED_DOWN', 45);
+    const oppX = Math.round(128 - sprite.width / 2);
+    const oppY = 150; // 50 + fallDy(100), dy = 0
+
+    let footprint = 0;
+    let notCovered = 0;
+    for (let sy = 0; sy < sprite.height; sy++) {
+      const py = oppY + sy;
+      if (py < 140 || py > 189) continue;
+      const row = sprite.rows[sy];
+      for (let sx = 0; sx < sprite.width; sx++) {
+        const ch = row[sx];
+        if (ch === '.' || ch === ' ') continue;
+        const px = oppX + sx;
+        if (px < 0 || px >= CANVAS_WIDTH) continue;
+        footprint++;
+        const i = (py * CANVAS_WIDTH + px) * 4;
+        if (bufWith[i] !== bufWithout[i] || bufWith[i + 1] !== bufWithout[i + 1] || bufWith[i + 2] !== bufWithout[i + 2]) {
+          notCovered++;
+        }
+      }
+    }
+
+    expect(footprint, 'opponent pixels in band').toBeGreaterThanOrEqual(600);
+    expect(notCovered / footprint, 'opponent pixels not hidden by the player').toBeGreaterThanOrEqual(0.6);
+  });
+});
+
 

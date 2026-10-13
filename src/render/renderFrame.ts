@@ -14,6 +14,42 @@ export const CANVAS_HEIGHT = 240;
 export const COUNT_DIGIT_X = 122;
 export const COUNT_DIGIT_Y = 60;
 
+// When the opponent is down for the count the player steps aside (to the right) so the
+// fallen opponent is not hidden behind him, the way the NES game clears the view.
+export const PLAYER_STEP_ASIDE_SHIFT = 64;
+export const PLAYER_STEP_ASIDE_MIN_X = 152;
+
+export function isPlayerSteppingAside(state: FightState): boolean {
+  return state.phase === 'KNOCKDOWN_COUNT' && state.referee.downFighter === 'OPPONENT';
+}
+
+// Compute the player draw position (and sprite) for a state. During the opponent's
+// count the player keeps his idle pose and is shifted to the right by at least
+// PLAYER_STEP_ASIDE_SHIFT so his left edge is at x >= PLAYER_STEP_ASIDE_MIN_X.
+export function computePlayerDraw(state: FightState): { x: number; y: number; sprite: SpriteData } {
+  const aside = isPlayerSteppingAside(state);
+  const action = aside ? 'IDLE' : state.player.action;
+  const actionFrame = aside ? 0 : (state.player.actionFrame || 0);
+  const transform = PLAYER_POSES[action] || PLAYER_POSES['IDLE'];
+  const sprite = resolvePlayerSprite(action, state.player.isExhausted);
+
+  let shakeX = 0;
+  if (transform.shake > 0) {
+    const sign = (Math.floor(actionFrame / 2) % 2 === 0) ? 1 : -1;
+    shakeX = sign * transform.shake;
+  }
+
+  let fallDy = 0;
+  if (transform.fall) {
+    fallDy = Math.min(30, Math.floor(actionFrame * 1.5));
+  }
+
+  const baseX = Math.round(128 - sprite.width / 2) + transform.dx + shakeX;
+  const x = aside ? Math.max(baseX + PLAYER_STEP_ASIDE_SHIFT, PLAYER_STEP_ASIDE_MIN_X) : baseX;
+  const y = 168 + transform.dy + fallDy;
+  return { x, y, sprite };
+}
+
 // Internal frame buffer (256 * 240 * 4 bytes)
 let pixelBuffer: ImageData | null = null;
 
@@ -228,8 +264,14 @@ export function renderFrame(
   const oppY = 50 + baseOppDy + fallDy + breathingDy + tauntBounceDy;
 
   if (!isKoHidden) {
-    // Star opportunity flash effect on opponent
-    const oppOverride = (state.opponent.starOpportunity && flash) ? 0x20 : undefined;
+    // Star opportunity flash effect on opponent — only during live play, never on a
+    // fighter who is already going down (otherwise the fallen opponent renders as a
+    // solid white silhouette and loses his own colors).
+    const starFlashActive =
+      state.phase === 'ROUND_ACTIVE' &&
+      state.opponent.action !== 'KNOCKED_DOWN' &&
+      state.opponent.action !== 'KO';
+    const oppOverride = (state.opponent.starOpportunity && flash && starFlashActive) ? 0x20 : undefined;
     // Opponent is clipped at ring floor line (y < 190) per Requirement 12
     blitSprite(data, oppSprite, oppX, oppY, oppOverride, 190);
 
@@ -249,22 +291,10 @@ export function renderFrame(
 
   // 5. Draw Player (Seen from behind, small at lower center overlapping opponent's lower body)
   const playerActionFrame = state.player.actionFrame || 0;
-  const playerTransform = PLAYER_POSES[state.player.action] || PLAYER_POSES['IDLE'];
-  const playerSprite = resolvePlayerSprite(state.player.action, state.player.isExhausted);
-
-  let pShakeX = 0;
-  if (playerTransform.shake > 0) {
-    const sign = (Math.floor(playerActionFrame / 2) % 2 === 0) ? 1 : -1;
-    pShakeX = sign * playerTransform.shake;
-  }
-
-  let pFallDy = 0;
-  if (playerTransform.fall) {
-    pFallDy = Math.min(30, Math.floor(playerActionFrame * 1.5));
-  }
-
-  const playerX = Math.round(128 - playerSprite.width / 2) + playerTransform.dx + pShakeX;
-  const playerY = 168 + playerTransform.dy + pFallDy;
+  const playerDraw = computePlayerDraw(state);
+  const playerSprite = playerDraw.sprite;
+  const playerX = playerDraw.x;
+  const playerY = playerDraw.y;
 
   blitSprite(data, playerSprite, playerX, playerY);
 
