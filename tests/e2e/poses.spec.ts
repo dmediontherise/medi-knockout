@@ -428,4 +428,54 @@ test.describe('Pose Preview and Contact Sheets Suite', () => {
       expect(hSpan, `${oppId} KO frame 30 horizontal span > vertical span`).toBeGreaterThan(vSpan);
     });
   }
+
+  // 5. Requirement 6: Review sheet screenshots in screenshots/feel/
+  // hit-left-<id>-2.png, hit-right-<id>-2.png, hit-body-<id>-2.png, lunge-<id>-PUNCH_HOOK_LEFT.png
+  const feelDir = path.join(screenshotsDir, 'feel');
+
+  test.describe('feel review screenshots', () => {
+    test.beforeAll(() => {
+      if (!fs.existsSync(feelDir)) {
+        fs.mkdirSync(feelDir, { recursive: true });
+      }
+    });
+
+    for (const oppId of OPPONENT_IDS) {
+      test(`feel screenshots: ${oppId}`, async ({ page }) => {
+        const feelCases = [
+          {
+            filename: `hit-left-${oppId}-2.png`,
+            query: `pose=${oppId}&action=HIT&frame=2&hitSide=LEFT&hitTarget=HEAD&player=IDLE`,
+          },
+          {
+            filename: `hit-right-${oppId}-2.png`,
+            query: `pose=${oppId}&action=HIT&frame=2&hitSide=RIGHT&hitTarget=HEAD&player=IDLE`,
+          },
+          {
+            filename: `hit-body-${oppId}-2.png`,
+            query: `pose=${oppId}&action=HIT&frame=2&hitSide=RIGHT&hitTarget=BODY&player=IDLE`,
+          },
+          {
+            filename: `lunge-${oppId}-PUNCH_HOOK_LEFT.png`,
+            query: `pose=${oppId}&action=PUNCH_HOOK_LEFT&frame=0&player=IDLE`,
+          },
+        ];
+
+        for (const item of feelCases) {
+          const pageErrors: Error[] = [];
+          page.on('pageerror', (err) => pageErrors.push(err));
+
+          await page.goto(`./?${item.query}`);
+          const canvas = page.locator('canvas.game-canvas');
+          await expect(canvas).toBeVisible();
+          await page.waitForTimeout(50);
+          expect(pageErrors).toHaveLength(0);
+
+          const filePath = path.join(feelDir, item.filename);
+          await canvas.screenshot({ path: filePath });
+          verifyPngNesPalette(filePath);
+        }
+      });
+    }
+  });
 });

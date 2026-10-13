@@ -72,6 +72,8 @@ export function createFight(opponentId: string, seed: number): FightState {
       aiWaitFrames: 45, // brief delay before first attack
       patternIndex: 0,
       lastTellAttack: null,
+      lastHitSide: 'RIGHT',
+      lastHitTarget: 'HEAD',
     },
 
     specialState: {
@@ -178,7 +180,7 @@ export function step(state: FightState, input: InputFrame): FightState {
   // ==========================================
   if (next.phase === 'BETWEEN_ROUNDS') {
     next.roundFrame++;
-    if (next.roundFrame >= ROUNDS.BETWEEN_ROUND_FRAMES) {
+    if (Boolean(input.start) && next.roundFrame >= ROUNDS.BETWEEN_ROUND_MIN_FRAMES) {
       // Start next round
       next.round++;
       next.phase = 'ROUND_ACTIVE';
@@ -299,6 +301,7 @@ export function step(state: FightState, input: InputFrame): FightState {
   // ==========================================
   let playerJustPunched = false;
   let punchType: 'HEAD' | 'BODY' | 'STAR' | null = null;
+  let punchHand: 'LEFT' | 'RIGHT' = 'RIGHT';
 
   if (next.player.action !== 'IDLE') {
     next.player.actionFrame++;
@@ -346,6 +349,7 @@ export function step(state: FightState, input: InputFrame): FightState {
       next.events.push('STAR_PUNCH');
       playerJustPunched = true;
       punchType = 'STAR';
+      punchHand = 'RIGHT';
     } else if (!next.player.isExhausted) {
       if (effectiveInput.punchLeftHead) {
         next.player.action = 'PUNCH_LEFT_HEAD';
@@ -353,24 +357,28 @@ export function step(state: FightState, input: InputFrame): FightState {
         next.player.actionFrame = 0;
         playerJustPunched = true;
         punchType = 'HEAD';
+        punchHand = 'LEFT';
       } else if (effectiveInput.punchRightHead) {
         next.player.action = 'PUNCH_RIGHT_HEAD';
         next.player.actionDuration = PLAYER_DURATIONS.PUNCH;
         next.player.actionFrame = 0;
         playerJustPunched = true;
         punchType = 'HEAD';
+        punchHand = 'RIGHT';
       } else if (effectiveInput.punchLeftBody) {
         next.player.action = 'PUNCH_LEFT_BODY';
         next.player.actionDuration = PLAYER_DURATIONS.PUNCH;
         next.player.actionFrame = 0;
         playerJustPunched = true;
         punchType = 'BODY';
+        punchHand = 'LEFT';
       } else if (effectiveInput.punchRightBody) {
         next.player.action = 'PUNCH_RIGHT_BODY';
         next.player.actionDuration = PLAYER_DURATIONS.PUNCH;
         next.player.actionFrame = 0;
         playerJustPunched = true;
         punchType = 'BODY';
+        punchHand = 'RIGHT';
       }
     }
   }
@@ -568,6 +576,8 @@ export function step(state: FightState, input: InputFrame): FightState {
         next.feedbackMessage = 'BLOCKED!';
       } else {
         // Attack lands!
+        next.opponent.lastHitSide = punchHand;
+        next.opponent.lastHitTarget = isHead || isStar ? 'HEAD' : 'BODY';
         next.player.hitsLanded++;
         let baseDmg = isStar
           ? STARS.STAR_PUNCH_DAMAGE

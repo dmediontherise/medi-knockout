@@ -461,28 +461,40 @@ export function buildFrame(frameName) {
       break;
 
     case 'DOWN':
-      // Horizontal across mat: body length horizontal, head on screen-left, gloves resting on chest.
-      // Width ~96 px, height <= 40 px.
+      // Redrawn per Task 015 Requirement 7:
+      // Player lying on his back, seen from foot end at low angle:
+      // - 80-100 px wide and 30-40 px tall
+      // - head (black hair ellipse) at screen-left
+      // - torso as a skin block at least 14 px tall
+      // - both red gloves resting on chest, each at least 12x10 px
+      // - trunks with white waistband (>= 20 W pixels)
+      // - legs bent at the knees, with knees raised above the torso line
       // Legs:
-      rig.drawCapsule(14, 87, 42, 87, 4.5, 'S', 'K', false);
-      rig.drawCapsule(14, 92, 44, 92, 4.5, 'S', 'K', true);
+      rig.drawCapsule(14, 88, 25, 70, 5, 'S');
+      rig.drawCapsule(25, 70, 37, 91, 4.5, 'S');
+      rig.drawCapsule(16, 91, 31, 69, 5.5, 'S');
+      rig.drawCapsule(31, 69, 41, 93, 5, 'S');
+      // Feet:
+      rig.drawCapsule(37, 93, 42, 95, 3, 'B');
+
       // Trunks:
-      rig.drawRect(-4, 82, 16, 97, 'B');
-      rig.drawRect(-4, 82, -1, 97, 'W');
-      // Torso:
-      rig.drawRect(-24, 83, -4, 96, 'S');
-      // Head:
-      rig.drawEllipse(-34, 89, 11, 8, 'B');
-      for (let y = 83; y <= 86; y++) {
-        for (let x = -42; x <= -36; x++) {
-          rig.setPixel(x, y, 'G');
-        }
-      }
-      // Gloves resting on chest:
-      rig.drawEllipse(-14, 86, 7, 6, 'R');
-      rig.drawEllipse(-6, 88, 7, 6, 'R');
-      rig.setPixel(-16, 84, 'H');
-      rig.setPixel(-8, 86, 'H');
+      rig.drawRect(0, 78, 18, 95, 'B');
+      // Waistband:
+      rig.drawRect(-1, 75, 18, 77, 'W');
+
+      // Torso: skin block at least 14 px tall (76 to 91 = 16 px):
+      rig.drawRect(-24, 76, 0, 91, 'S');
+
+      // Head: black hair ellipse at screen-left:
+      rig.drawEllipse(-34, 85, 9.5, 7.5, 'B');
+      rig.drawEllipse(-30, 85, 6, 5, 'S');
+
+      // Gloves: both red gloves resting on chest, each >= 12x10 and >= 80 px:
+      rig.drawEllipse(-17, 84, 6.2, 5.2, 'R');
+      rig.drawEllipse(-3, 84, 6.2, 5.2, 'R');
+      rig.setPixel(-19, 82, 'H');
+      rig.setPixel(-5, 82, 'H');
+
       rig.applyOutline();
       return rig.toSpriteData();
 

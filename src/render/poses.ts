@@ -332,7 +332,7 @@ export const PLAYER_POSES: Record<ActionType | string, PlayerPoseTransform> = {
   HOOK_RIGHT: { dx: 0, dy: 0, palette: 'normal', shake: 0, fall: false },
   UPPERCUT: { dx: 0, dy: 0, palette: 'normal', shake: 0, fall: false },
   STAR_PUNCH: { dx: 0, dy: 0, palette: 'normal', shake: 0, fall: false },
-  HIT: { dx: 0, dy: 0, palette: 'normal', shake: 2, fall: false },
+  HIT: { dx: 0, dy: 0, palette: 'normal', shake: 0, fall: false },
   KNOCKED_DOWN: { dx: 0, dy: 0, palette: 'normal', shake: 0, fall: false },
   KO: { dx: 0, dy: 0, palette: 'normal', shake: 0, fall: false },
 };
@@ -411,7 +411,9 @@ export function getSpriteAnchor(sprite: SpriteData): OpponentAnchor {
 export function getOpponentSprite(
   opponentId: string,
   action: OpponentActionType | string,
-  actionFrame: number = 0
+  actionFrame: number = 0,
+  hitSide: 'LEFT' | 'RIGHT' = 'RIGHT',
+  hitTarget: 'HEAD' | 'BODY' = 'HEAD'
 ): SpriteData {
   const charId = OPPONENT_FRAME_MAPS[opponentId] ? opponentId : 'aint_man';
   const frames = OPPONENT_FRAME_MAPS[charId];
@@ -427,18 +429,29 @@ export function getOpponentSprite(
     baseActionKey = action.replace('_LEFT', '');
   }
 
-  // Knockdown / KO frame logic:
-  // On actionFrame 0-9, draw the HIT frame
-  // From actionFrame 10 on, draw the lying frame
+  // Figure key and mirroring logic
   let figKey: number | string;
+  let flip = false;
+
   if (action === 'KNOCKED_DOWN' || action === 'KO') {
     if (actionFrame < 10) {
       figKey = figMap['HIT'] ?? 2;
+      flip = (hitSide === 'LEFT');
     } else {
       figKey = figMap['KNOCKED_DOWN'] ?? 'LIE';
+      flip = false;
+    }
+  } else if (action === 'HIT') {
+    if (hitTarget === 'BODY') {
+      figKey = figMap['BLOCK_LOW'] ?? 10;
+      flip = false;
+    } else {
+      figKey = figMap['HIT'] ?? 2;
+      flip = (hitSide === 'LEFT'); // 'LEFT' hit snaps head toward screen-right
     }
   } else {
     figKey = figMap[baseActionKey] ?? figMap[action] ?? 0;
+    flip = isRight || transform.flipX;
   }
 
   const baseSprite = frames[figKey] || frames[0] || IDLE_BASES[charId];
@@ -460,8 +473,8 @@ export function getOpponentSprite(
     activePalette = (actionFrame <= 3) ? 'flash' : 'normal';
   }
 
-  // Horizontal flip for _RIGHT
-  let sprite = (isRight || transform.flipX) ? mirrorSprite(baseSprite) : baseSprite;
+  // Horizontal flip
+  let sprite = flip ? mirrorSprite(baseSprite) : baseSprite;
 
   // Palette effect
   if (activePalette !== 'normal') {

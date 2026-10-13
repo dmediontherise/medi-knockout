@@ -48,6 +48,7 @@ export interface InputFrame {
   duck?: boolean;
   block?: boolean;
   mash?: boolean;
+  start?: boolean;
 }
 
 export type SoundEvent =
@@ -130,6 +131,8 @@ export interface FightState {
     aiWaitFrames: number;
     patternIndex: number;
     lastTellAttack: AttackType | null;
+    lastHitSide?: 'LEFT' | 'RIGHT';
+    lastHitTarget?: 'HEAD' | 'BODY';
   };
 
   specialState: {

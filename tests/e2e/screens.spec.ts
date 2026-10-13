@@ -177,6 +177,20 @@ test.describe('Presentation screens e2e (Task 009 Req 11)', () => {
     expect(fs.existsSync(betweenRoundsPath)).toBe(true);
     verifyPngNesPalette(betweenRoundsPath);
 
+    // Task 015 Requirement 5:
+    // the ?debug=betweenrounds screen is still shown after 5 s
+    await page.waitForTimeout(5000);
+    const container = page.locator('[data-round="1"]');
+    await expect(container).toBeVisible();
+
+    // after Enter the fight is in round 2 (data-round="2" or R2 in HUD)
+    await page.keyboard.press('Enter');
+    await page.waitForFunction(
+      () => document.querySelector('[data-round="2"]') !== null,
+      null,
+      { timeout: 5000 }
+    );
+
     expect(pageErrors).toHaveLength(0);
   });
 });

@@ -635,9 +635,10 @@ describe('R9 rounds and decisions', () => {
     expect(state.phase).toBe('BETWEEN_ROUNDS');
 
     // Fast-forward through between rounds
-    for (let i = 0; i < ROUNDS.BETWEEN_ROUND_FRAMES; i++) {
+    for (let i = 0; i < ROUNDS.BETWEEN_ROUND_MIN_FRAMES; i++) {
       state = step(state, {});
     }
+    state = step(state, { start: true });
     expect(state.round).toBe(2);
     expect(state.phase).toBe('ROUND_ACTIVE');
   });
@@ -652,9 +653,9 @@ describe('R9 rounds and decisions', () => {
     sHeal.player.hp = 20;
     sHeal.player.hearts = 1;
     sHeal.phase = 'BETWEEN_ROUNDS';
-    sHeal.roundFrame = ROUNDS.BETWEEN_ROUND_FRAMES - 1;
+    sHeal.roundFrame = ROUNDS.BETWEEN_ROUND_MIN_FRAMES;
 
-    sHeal = step(sHeal, {});
+    sHeal = step(sHeal, { start: true });
     expect(sHeal.round).toBe(2);
     expect(sHeal.phase).toBe('ROUND_ACTIVE');
     expect(sHeal.player.hp).toBe(20 + Math.floor(sHeal.player.maxHp * ROUNDS.BETWEEN_ROUND_HEAL_RATIO));
@@ -689,11 +690,11 @@ describe('R9 rounds and decisions', () => {
   it('R9 between-round transition resets player isExhausted to false', () => {
     let state = createFight('aint_man', 1);
     state.phase = 'BETWEEN_ROUNDS';
-    state.roundFrame = ROUNDS.BETWEEN_ROUND_FRAMES - 1;
+    state.roundFrame = ROUNDS.BETWEEN_ROUND_MIN_FRAMES;
     state.player.isExhausted = true;
     state.player.hearts = 0;
 
-    state = step(state, {});
+    state = step(state, { start: true });
     expect(state.phase).toBe('ROUND_ACTIVE');
     expect(state.player.isExhausted).toBe(false);
   });
@@ -814,6 +815,99 @@ describe('R10 characters and specials preserved', () => {
       expect(state.events).toContain('COUNTER');
       expect(state.opponent.action).toBe('STUNNED');
       expect(state.opponent.hp).toBeLessThan(initialHp);
+    });
+  });
+
+  describe('Task 015 Requirement 3 & 5: Fight feel core engine tests', () => {
+    it('Requirement 5: 5000 frames with no start stay in BETWEEN_ROUNDS', () => {
+      let state = createFight('aint_man', 123);
+      state.phase = 'BETWEEN_ROUNDS';
+      state.roundFrame = 0;
+
+      for (let i = 0; i < 5000; i++) {
+        state = step(state, {});
+      }
+
+      expect(state.phase).toBe('BETWEEN_ROUNDS');
+      expect(state.round).toBe(1);
+      expect(state.roundFrame).toBe(5000);
+    });
+
+    it('Requirement 5: start at frame 30 does nothing, start at frame 60 enters round 2 with same healing', () => {
+      let state = createFight('aint_man', 123);
+      state.player.hp = 20;
+      state.player.hearts = 1;
+      state.phase = 'BETWEEN_ROUNDS';
+      state.roundFrame = 0;
+
+      // Advance 29 frames with no start
+      for (let i = 0; i < 29; i++) {
+        state = step(state, {});
+      }
+      expect(state.roundFrame).toBe(29);
+
+      // Press start at frame 30 -> does nothing
+      state = step(state, { start: true });
+      expect(state.roundFrame).toBe(30);
+      expect(state.phase).toBe('BETWEEN_ROUNDS');
+      expect(state.round).toBe(1);
+      expect(state.player.hp).toBe(20);
+
+      // Advance to frame 59 with no start
+      for (let i = 30; i < 59; i++) {
+        state = step(state, {});
+      }
+      expect(state.roundFrame).toBe(59);
+
+      // Press start at frame 60 -> enters round 2 with healing
+      state = step(state, { start: true });
+      expect(state.phase).toBe('ROUND_ACTIVE');
+      expect(state.round).toBe(2);
+      expect(state.roundFrame).toBe(0);
+      const expectedHealed = Math.floor(state.player.maxHp * ROUNDS.BETWEEN_ROUND_HEAL_RATIO);
+      expect(state.player.hp).toBe(20 + expectedHealed);
+      expect(state.player.hearts).toBe(ROSTER_SPECS.aint_man.initialHearts);
+    });
+
+    it('Requirement 3: lastHitSide/lastHitTarget are render-only; 3 seeded 3000-frame fights per opponent are identical with fields stripped', () => {
+      const rosterIds = ['aint_man', 'medi_jinx', 'dj_tito', 'mr_yankee', 'maga_man'] as const;
+      const seeds = [42, 1337, 9999];
+
+      for (const oppId of rosterIds) {
+        for (const seed of seeds) {
+          // Run 1: normal execution with lastHitSide and lastHitTarget populated
+          let s1 = createFight(oppId, seed);
+          const trace1: string[] = [];
+
+          // Run 2: execution where lastHitSide and lastHitTarget are stripped after every frame
+          let s2 = createFight(oppId, seed);
+          delete s2.opponent.lastHitSide;
+          delete s2.opponent.lastHitTarget;
+          const trace2: string[] = [];
+
+          for (let f = 0; f < 3000; f++) {
+            // Generate some deterministic inputs
+            const inp: InputFrame = {};
+            if (f % 40 === 0) inp.punchLeftHead = true;
+            if (f % 55 === 0) inp.punchRightBody = true;
+            if (f % 90 === 0) inp.starPunch = true;
+            if (f % 30 === 0) inp.dodgeLeft = true;
+            if (f % 70 === 0) inp.duck = true;
+
+            s1 = step(s1, inp);
+            s2 = step(s2, inp);
+
+            // Strip render-only fields from s2
+            delete s2.opponent.lastHitSide;
+            delete s2.opponent.lastHitTarget;
+
+            trace1.push(`${s1.player.hp},${s1.player.hearts},${s1.player.points},${s1.opponent.hp}`);
+            trace2.push(`${s2.player.hp},${s2.player.hearts},${s2.player.points},${s2.opponent.hp}`);
+          }
+
+          expect(trace1).toEqual(trace2);
+        }
+      }
     });
   });
 });

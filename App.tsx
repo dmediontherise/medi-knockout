@@ -67,6 +67,14 @@ const App: React.FC = () => {
         preview.opponent.action = oppAction as OpponentActionType;
         preview.opponent.actionFrame = actionFrameNum;
       }
+      const hitSide = params.get('hitSide');
+      const hitTarget = params.get('hitTarget');
+      if (hitSide === 'LEFT' || hitSide === 'RIGHT') {
+        preview.opponent.lastHitSide = hitSide;
+      }
+      if (hitTarget === 'HEAD' || hitTarget === 'BODY') {
+        preview.opponent.lastHitTarget = hitTarget;
+      }
       if (playerAction) {
         preview.player.action = playerAction as ActionType;
         preview.player.actionFrame = pframeNum;
@@ -248,6 +256,7 @@ const App: React.FC = () => {
   return (
     <div 
       data-game-state={effectiveGameState}
+      data-round={activeState.round}
       data-referee-count={activeState.referee.count}
       className={`fixed inset-0 w-full h-[100dvh] bg-slate-950 overflow-hidden flex flex-col items-center select-none touch-none ${isPlayerHit ? 'animate-shake' : ''}`}
     >

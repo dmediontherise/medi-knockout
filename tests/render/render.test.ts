@@ -16,7 +16,19 @@ import {
 import { getPlayerSprite, resolvePlayerFrame, PLAYER_BACK_IDLE } from '../../src/render/sprites/player';
 import { REFEREE_SPRITES, getLargeCountDigitSprite } from '../../src/render/sprites/referee';
 import { SpriteData } from '../../src/render/sprites/types';
-import { renderFrame, CANVAS_WIDTH, CANVAS_HEIGHT, COUNT_DIGIT_X, COUNT_DIGIT_Y, computePlayerDraw, computeOpponentDraw, isPlayerSteppingAside, PLAYER_STEP_ASIDE_MIN_X } from '../../src/render/renderFrame';
+import {
+  renderFrame,
+  CANVAS_WIDTH,
+  CANVAS_HEIGHT,
+  COUNT_DIGIT_X,
+  COUNT_DIGIT_Y,
+  computePlayerDraw,
+  computeOpponentDraw,
+  computeScreenShake,
+  computeOpponentLunge,
+  isPlayerSteppingAside,
+  PLAYER_STEP_ASIDE_MIN_X,
+} from '../../src/render/renderFrame';
 import { nesToRgba } from '../../src/render/nesPalette';
 import {
   renderCircuitScreen,
@@ -1112,12 +1124,14 @@ describe('Task 012: Real animation frames from sheets', () => {
 
     for (const id of ['aint_man', 'medi_jinx', 'dj_tito', 'mr_yankee', 'maga_man']) {
       for (const action of STANDING_ACTIONS) {
-        const sprite = getOpponentSprite(id, action, 0);
-        const { x, y } = computeOpponentDraw(id, action, 0, 0);
+        // Requirement 8: Where shake or lunge would move pixels, test with frames outside those windows
+        const testActionFrame = action.startsWith('PUNCH_') ? 99 : (action === 'HIT' ? 12 : 0);
+        const sprite = getOpponentSprite(id, action, testActionFrame);
+        const { x, y } = computeOpponentDraw(id, action, testActionFrame, 0);
         const pose = OPPONENT_POSES[action] ?? { dx: 0, dy: 0, shake: 0 };
 
         // 1. Bottom row of sprite is at y = 190 (bottom row index in canvas: y + sprite.height - 1)
-        const expectedY = action === 'TAUNT' ? 190 : (190 + pose.dy);
+        const expectedY = (action === 'TAUNT' || action.startsWith('PUNCH_') || action === 'HIT') ? 190 : (190 + pose.dy);
         expect(y + sprite.height - 1, `${id} ${action} bottom row lands at y = 190`).toBe(expectedY);
 
         // 2. Head center x of opaque pixels in the top 25% of rows lands at x = 128 ± 2 (± the pose's dx accent)
@@ -1136,14 +1150,11 @@ describe('Task 012: Real animation frames from sheets', () => {
         expect(count, `${id} ${action} has opaque pixels in top 25% rows`).toBeGreaterThan(0);
         const headLocalCenterX = Math.round(sumX / count);
         const headWorldCenterX = x + headLocalCenterX;
-        // x in computeOpponentDraw includes oppTransform.dx + oppShakeX
-        // Requirement 3 specifies: center x lands at 128 ± 2 (± the pose's dx accent [± shake])
-        const expectedX = 128 + pose.dx + (computeOpponentDraw(id, action, 0, 0) as any).x - (Math.round(128 - headLocalCenterX) + pose.dx);
-        // More simply: headWorldCenterX should land at 128 + pose.dx ± 2 (ignoring momentary shake) or including shake:
         const shakeX = (pose.shake > 0) ? pose.shake : 0;
+        const expectedDx = (action.startsWith('PUNCH_') || action === 'HIT') ? 0 : (pose.dx + shakeX);
         expect(
-          Math.abs(headWorldCenterX - (128 + pose.dx + shakeX)),
-          `${id} ${action} head center ${headWorldCenterX} lands at 128 + ${pose.dx} + ${shakeX} ± 2`
+          Math.abs(headWorldCenterX - (128 + expectedDx)),
+          `${id} ${action} head center ${headWorldCenterX} lands at 128 + ${expectedDx} ± 2`
         ).toBeLessThanOrEqual(2);
       }
     }
@@ -1894,5 +1905,312 @@ describe('Task 014: Animated player rig', () => {
     expect(canvasHeadTopY, 'IDLE head top is <= 146').toBeLessThanOrEqual(146);
   });
 });
+
+describe('Task 015: Fight feel tests (Screen shake, Directional hit, Punch lunge, Player DOWN)', () => {
+  function createMockCanvas(): { ctx: CanvasRenderingContext2D; buffer: Uint8ClampedArray } {
+    const buffer = new Uint8ClampedArray(CANVAS_WIDTH * CANVAS_HEIGHT * 4);
+    const ctx = {
+      createImageData: (w: number, h: number) => ({ width: w, height: h, data: buffer }),
+      putImageData: (imgData: any) => { buffer.set(imgData.data); },
+    } as unknown as CanvasRenderingContext2D;
+    return { ctx, buffer };
+  }
+
+  // Requirement 2: Screen shake
+  describe('Requirement 2: Screen shake', () => {
+    it('applies horizontal shake for player HIT and vertical shake for fighter mat landing', () => {
+      // 1. Player HIT: actionFrame 0-7 alternates ±2 px horizontally
+      const hit0 = createFight('aint_man', 1); hit0.player.action = 'HIT'; hit0.player.actionFrame = 0;
+      const hit2 = createFight('aint_man', 1); hit2.player.action = 'HIT'; hit2.player.actionFrame = 2;
+      const hit8 = createFight('aint_man', 1); hit8.player.action = 'HIT'; hit8.player.actionFrame = 8;
+      expect(computeScreenShake(hit0)).toEqual({ shakeX: 2, shakeY: 0 });
+      expect(computeScreenShake(hit2)).toEqual({ shakeX: -2, shakeY: 0 });
+      expect(computeScreenShake(hit8)).toEqual({ shakeX: 0, shakeY: 0 });
+
+      // 2. Opponent KD/KO: actionFrame 10-21 alternates ±3 px vertically
+      const oppKd10 = createFight('aint_man', 1); oppKd10.opponent.action = 'KNOCKED_DOWN'; oppKd10.opponent.actionFrame = 10;
+      const oppKd12 = createFight('aint_man', 1); oppKd12.opponent.action = 'KNOCKED_DOWN'; oppKd12.opponent.actionFrame = 12;
+      const oppKd22 = createFight('aint_man', 1); oppKd22.opponent.action = 'KNOCKED_DOWN'; oppKd22.opponent.actionFrame = 22;
+      expect(computeScreenShake(oppKd10)).toEqual({ shakeX: 0, shakeY: 3 });
+      expect(computeScreenShake(oppKd12)).toEqual({ shakeX: 0, shakeY: -3 });
+      expect(computeScreenShake(oppKd22)).toEqual({ shakeX: 0, shakeY: 0 });
+
+      // 3. Player KD/KO: actionFrame 12-23 alternates ±3 px vertically
+      const pKd12 = createFight('aint_man', 1); pKd12.player.action = 'KNOCKED_DOWN'; pKd12.player.actionFrame = 12;
+      const pKd14 = createFight('aint_man', 1); pKd14.player.action = 'KNOCKED_DOWN'; pKd14.player.actionFrame = 14;
+      const pKd24 = createFight('aint_man', 1); pKd24.player.action = 'KNOCKED_DOWN'; pKd24.player.actionFrame = 24;
+      expect(computeScreenShake(pKd12)).toEqual({ shakeX: 0, shakeY: 3 });
+      expect(computeScreenShake(pKd14)).toEqual({ shakeX: 0, shakeY: -3 });
+      expect(computeScreenShake(pKd24)).toEqual({ shakeX: 0, shakeY: 0 });
+    });
+
+    it('renders each shake case: HUD rows y < 40 are identical to unshaken render, and ring rows are shifted', () => {
+      // Baseline unshaken render
+      const baseFight = createFight('aint_man', 1);
+      baseFight.player.action = 'IDLE';
+      baseFight.opponent.action = 'IDLE';
+      const mBase = createMockCanvas();
+      renderFrame(mBase.ctx, baseFight);
+
+      // Case 1: Player HIT at frame 0 (shakeX = +2)
+      const fHit = createFight('aint_man', 1);
+      fHit.player.action = 'HIT';
+      fHit.player.actionFrame = 0;
+      const mHit = createMockCanvas();
+      renderFrame(mHit.ctx, fHit);
+
+      // HUD rows y < 40 identical
+      for (let y = 0; y < 40; y++) {
+        for (let x = 0; x < CANVAS_WIDTH; x++) {
+          const idx = (y * CANVAS_WIDTH + x) * 4;
+          expect(mHit.buffer[idx], `HUD pixel at (${x},${y}) r matches`).toBe(mBase.buffer[idx]);
+          expect(mHit.buffer[idx + 1], `HUD pixel at (${x},${y}) g matches`).toBe(mBase.buffer[idx + 1]);
+          expect(mHit.buffer[idx + 2], `HUD pixel at (${x},${y}) b matches`).toBe(mBase.buffer[idx + 2]);
+        }
+      }
+      // Ring row shifted horizontally by +2 px (top rope at y = 88)
+      // Unshaken top rope starts at x = 24; shaken with +2 starts at x = 26
+      const baseRopeIdx = (88 * CANVAS_WIDTH + 24) * 4;
+      const shakenRopeIdx = (88 * CANVAS_WIDTH + 26) * 4;
+      expect(mHit.buffer[shakenRopeIdx]).toBe(mBase.buffer[baseRopeIdx]);
+
+      // Case 2: Opponent KD landing at frame 10 (shakeY = +3)
+      const fOppKd = createFight('aint_man', 1);
+      fOppKd.opponent.action = 'KNOCKED_DOWN';
+      fOppKd.opponent.actionFrame = 10;
+      const mOppKd = createMockCanvas();
+      renderFrame(mOppKd.ctx, fOppKd);
+
+      // HUD rows y < 40 identical
+      for (let y = 0; y < 40; y++) {
+        for (let x = 0; x < CANVAS_WIDTH; x++) {
+          const idx = (y * CANVAS_WIDTH + x) * 4;
+          expect(mOppKd.buffer[idx]).toBe(mBase.buffer[idx]);
+          expect(mOppKd.buffer[idx + 1]).toBe(mBase.buffer[idx + 1]);
+          expect(mOppKd.buffer[idx + 2]).toBe(mBase.buffer[idx + 2]);
+        }
+      }
+      // Ring row shifted vertically by +3 px (top rope at x = 220 from 88 to 91)
+      const shakenRopeYIdx = (91 * CANVAS_WIDTH + 220) * 4;
+      const baseRopeYIdx = (88 * CANVAS_WIDTH + 220) * 4;
+      expect(mOppKd.buffer[shakenRopeYIdx]).toBe(mBase.buffer[baseRopeYIdx]);
+
+      // Case 3: Player KD landing at frame 12 (shakeY = +3)
+      const fPlayerKd = createFight('aint_man', 1);
+      fPlayerKd.player.action = 'KNOCKED_DOWN';
+      fPlayerKd.player.actionFrame = 12;
+      const mPlayerKd = createMockCanvas();
+      renderFrame(mPlayerKd.ctx, fPlayerKd);
+
+      for (let y = 0; y < 40; y++) {
+        for (let x = 0; x < CANVAS_WIDTH; x++) {
+          const idx = (y * CANVAS_WIDTH + x) * 4;
+          expect(mPlayerKd.buffer[idx]).toBe(mBase.buffer[idx]);
+          expect(mPlayerKd.buffer[idx + 1]).toBe(mBase.buffer[idx + 1]);
+          expect(mPlayerKd.buffer[idx + 2]).toBe(mBase.buffer[idx + 2]);
+        }
+      }
+      expect(mPlayerKd.buffer[shakenRopeYIdx]).toBe(mBase.buffer[baseRopeYIdx]);
+    });
+  });
+
+  // Requirement 3: Directional hit reaction
+  describe('Requirement 3: Directional hit reaction', () => {
+    const rosterIds = ['aint_man', 'medi_jinx', 'dj_tito', 'mr_yankee', 'maga_man'] as const;
+
+    for (const id of rosterIds) {
+      it(`${id}: head center for LEFT head hit at actionFrame 2 is >= 6 px right of RIGHT head hit`, () => {
+        const leftDraw = computeOpponentDraw(id, 'HIT', 2, 0, 'LEFT', 'HEAD');
+        const rightDraw = computeOpponentDraw(id, 'HIT', 2, 0, 'RIGHT', 'HEAD');
+
+        function getHeadCenterWorld(draw: { x: number; y: number; sprite: SpriteData }) {
+          const top25Rows = Math.floor(draw.sprite.height * 0.25);
+          let sumX = 0;
+          let count = 0;
+          for (let y = 0; y < top25Rows; y++) {
+            const row = draw.sprite.rows[y];
+            for (let x = 0; x < draw.sprite.width; x++) {
+              if (row[x] !== '.' && row[x] !== ' ') {
+                sumX += x;
+                count++;
+              }
+            }
+          }
+          const localCenter = count > 0 ? (sumX / count) : (draw.sprite.width / 2);
+          return draw.x + localCenter;
+        }
+
+        const leftHeadCenter = getHeadCenterWorld(leftDraw);
+        const rightHeadCenter = getHeadCenterWorld(rightDraw);
+
+        expect(
+          leftHeadCenter - rightHeadCenter,
+          `${id} LEFT head hit center (${leftHeadCenter}) is >= 6 px right of RIGHT (${rightHeadCenter})`
+        ).toBeGreaterThanOrEqual(6);
+      });
+
+      it(`${id}: body-hit render differs from head-hit render by >= 300 px`, () => {
+        const headFight = createFight(id, 1);
+        headFight.opponent.action = 'HIT';
+        headFight.opponent.actionFrame = 2;
+        headFight.opponent.lastHitSide = 'RIGHT';
+        headFight.opponent.lastHitTarget = 'HEAD';
+
+        const bodyFight = createFight(id, 1);
+        bodyFight.opponent.action = 'HIT';
+        bodyFight.opponent.actionFrame = 2;
+        bodyFight.opponent.lastHitSide = 'RIGHT';
+        bodyFight.opponent.lastHitTarget = 'BODY';
+
+        const mHead = createMockCanvas();
+        renderFrame(mHead.ctx, headFight);
+        const mBody = createMockCanvas();
+        renderFrame(mBody.ctx, bodyFight);
+
+        let diffCount = 0;
+        for (let i = 0; i < mHead.buffer.length; i += 4) {
+          if (
+            mHead.buffer[i] !== mBody.buffer[i] ||
+            mHead.buffer[i + 1] !== mBody.buffer[i + 1] ||
+            mHead.buffer[i + 2] !== mBody.buffer[i + 2]
+          ) {
+            diffCount++;
+          }
+        }
+
+        expect(diffCount, `${id} body hit differs from head hit by >= 300 px`).toBeGreaterThanOrEqual(300);
+      });
+    }
+  });
+
+  // Requirement 4: Punch lunge
+  describe('Requirement 4: Punch lunge', () => {
+    it('asserts punch lunge offsets at first active frame, and that they are 0 by last recovery frame', () => {
+      // JAB (activeFrames 8, recovery 18 -> total 26)
+      const jab0 = computeOpponentLunge('PUNCH_JAB_LEFT', 0);
+      expect(jab0).toEqual({ lungeDx: 0, lungeDy: 8 });
+      const jabLast = computeOpponentLunge('PUNCH_JAB_LEFT', 26);
+      expect(jabLast).toEqual({ lungeDx: 0, lungeDy: 0 });
+
+      // HOOK (activeFrames 10, recovery 22 -> total 32)
+      // _LEFT toward screen-right (+10), _RIGHT toward screen-left (-10)
+      const hookL0 = computeOpponentLunge('PUNCH_HOOK_LEFT', 0);
+      expect(hookL0).toEqual({ lungeDx: 10, lungeDy: 8 });
+      const hookR0 = computeOpponentLunge('PUNCH_HOOK_RIGHT', 0);
+      expect(hookR0).toEqual({ lungeDx: -10, lungeDy: 8 });
+
+      const hookLLast = computeOpponentLunge('PUNCH_HOOK_LEFT', 32);
+      expect(hookLLast).toEqual({ lungeDx: 0, lungeDy: 0 });
+      const hookRLast = computeOpponentLunge('PUNCH_HOOK_RIGHT', 32);
+      expect(hookRLast).toEqual({ lungeDx: 0, lungeDy: 0 });
+
+      // UPPERCUT (activeFrames 12, recovery 28 -> total 40)
+      const upp0 = computeOpponentLunge('PUNCH_UPPERCUT_LEFT', 0);
+      expect(upp0).toEqual({ lungeDx: 0, lungeDy: 8 });
+      const uppLast = computeOpponentLunge('PUNCH_UPPERCUT_LEFT', 40);
+      expect(uppLast).toEqual({ lungeDx: 0, lungeDy: 0 });
+
+      // TELL_* frames have no lunge
+      expect(computeOpponentLunge('TELL_HOOK_LEFT', 0)).toEqual({ lungeDx: 0, lungeDy: 0 });
+      expect(computeOpponentLunge('TELL_JAB_RIGHT', 10)).toEqual({ lungeDx: 0, lungeDy: 0 });
+      expect(computeOpponentLunge('IDLE', 0)).toEqual({ lungeDx: 0, lungeDy: 0 });
+    });
+  });
+
+  // Requirement 7: Readable knocked-down player
+  describe('Requirement 7: Readable knocked-down player', () => {
+    it('PLAYER_DOWN satisfies size, glove components, waistband, and knee height', () => {
+      const down = resolvePlayerFrame('KNOCKED_DOWN', 20).sprite;
+
+      // 1. Size: 80-100 px wide and 30-40 px tall
+      expect(down.width, 'width is 80-100 px').toBeGreaterThanOrEqual(80);
+      expect(down.width, 'width is 80-100 px').toBeLessThanOrEqual(100);
+      expect(down.height, 'height is 30-40 px').toBeGreaterThanOrEqual(30);
+      expect(down.height, 'height is 30-40 px').toBeLessThanOrEqual(40);
+
+      // 2. Head at screen-left: opaque pixels in left 20 columns
+      let leftOpaqueCount = 0;
+      for (const row of down.rows) {
+        for (let c = 0; c < 20; c++) {
+          if (row[c] !== '.' && row[c] !== ' ') leftOpaqueCount++;
+        }
+      }
+      expect(leftOpaqueCount, 'head at screen-left has opaque pixels').toBeGreaterThan(20);
+
+      // 3. Torso as skin block at least 14 px tall
+      let torsoMinRow = Infinity;
+      let torsoMaxRow = -Infinity;
+      for (let r = 0; r < down.height; r++) {
+        const row = down.rows[r];
+        // Torso is between head (x < 25) and trunks (x > 50)
+        for (let c = 20; c < 50; c++) {
+          if (row[c] === 'S' || row[c] === 'K') {
+            torsoMinRow = Math.min(torsoMinRow, r);
+            torsoMaxRow = Math.max(torsoMaxRow, r);
+          }
+        }
+      }
+      const torsoHeight = torsoMaxRow - torsoMinRow + 1;
+      expect(torsoHeight, 'torso skin block is at least 14 px tall').toBeGreaterThanOrEqual(14);
+
+      // 4. >= 2 red-glove components, each >= 80 px
+      const visited = new Set<string>();
+      const components: string[][] = [];
+      for (let r = 0; r < down.height; r++) {
+        for (let c = 0; c < down.width; c++) {
+          const char = down.rows[r][c];
+          const key = `${c},${r}`;
+          if ((char === 'R' || char === 'H') && !visited.has(key)) {
+            const comp: string[] = [];
+            const queue = [key];
+            visited.add(key);
+            while (queue.length > 0) {
+              const cur = queue.pop()!;
+              comp.push(cur);
+              const [cx, cy] = cur.split(',').map(Number);
+              for (const [nx, ny] of [[cx + 1, cy], [cx - 1, cy], [cx, cy + 1], [cx, cy - 1]]) {
+                if (nx >= 0 && nx < down.width && ny >= 0 && ny < down.height) {
+                  const nchar = down.rows[ny][nx];
+                  const nkey = `${nx},${ny}`;
+                  if ((nchar === 'R' || nchar === 'H') && !visited.has(nkey)) {
+                    visited.add(nkey);
+                    queue.push(nkey);
+                  }
+                }
+              }
+            }
+            components.push(comp);
+          }
+        }
+      }
+      expect(components.length, 'has >= 2 red-glove components').toBeGreaterThanOrEqual(2);
+      for (const comp of components) {
+        expect(comp.length, 'each red-glove component has >= 80 px').toBeGreaterThanOrEqual(80);
+      }
+
+      // 5. >= 20 W pixels (white waistband)
+      let countW = 0;
+      for (const row of down.rows) {
+        for (let c = 0; c < down.width; c++) {
+          if (row[c] === 'W') countW++;
+        }
+      }
+      expect(countW, 'has >= 20 W pixels').toBeGreaterThanOrEqual(20);
+
+      // 6. Knee rows are above the torso's top row (smaller row index in sprite)
+      let kneeMinRow = Infinity;
+      for (let r = 0; r < down.height; r++) {
+        const row = down.rows[r];
+        for (let c = 55; c < down.width; c++) {
+          if (row[c] === 'S' || row[c] === 'K') {
+            kneeMinRow = Math.min(kneeMinRow, r);
+          }
+        }
+      }
+      expect(kneeMinRow, 'knee rows are above torso top row').toBeLessThan(torsoMinRow);
+    });
+  });
+});
+
 
 

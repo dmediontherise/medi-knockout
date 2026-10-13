@@ -4,6 +4,8 @@ import { ROSTER } from '../constants';
 import { soundEngine } from '../utils/sound';
 import { createFight, step } from '../src/core/engine';
 import { FightState, InputFrame, SoundEvent } from '../src/core/types';
+import { ROUNDS } from '../src/core/constants';
+import { hitStopFrames, bufferInput } from './hitStop';
 
 // Helper to map engine ActionType to legacy PlayerAction
 function mapPlayerAction(action: string): PlayerAction {
@@ -91,6 +93,8 @@ export const useGameLoop = () => {
 
   // Current inputs buffer for the next frame(s)
   const pendingInputRef = useRef<InputFrame>({});
+  const bufferedInputRef = useRef<InputFrame>({});
+  const hitStopCounterRef = useRef<number>(0);
   const isBlockHeldRef = useRef(false);
 
   // Transition timer (in integer frames)
@@ -228,6 +232,8 @@ export const useGameLoop = () => {
     engineStateRef.current = fight;
 
     pendingInputRef.current = {};
+    bufferedInputRef.current = {};
+    hitStopCounterRef.current = 0;
     isBlockHeldRef.current = false;
     lastHitTypeRef.current = 'NONE';
     accumulatorRef.current = 0;
@@ -270,6 +276,7 @@ export const useGameLoop = () => {
       case PlayerAction.PUNCH_RIGHT_HEAD:
         pendingInputRef.current.punchRightHead = true;
         pendingInputRef.current.mash = true;
+        pendingInputRef.current.start = true;
         break;
       case PlayerAction.PUNCH_LEFT_BODY:
         pendingInputRef.current.punchLeftBody = true;
@@ -278,10 +285,12 @@ export const useGameLoop = () => {
       case PlayerAction.PUNCH_RIGHT_BODY:
         pendingInputRef.current.punchRightBody = true;
         pendingInputRef.current.mash = true;
+        pendingInputRef.current.start = true;
         break;
       case PlayerAction.STAR_PUNCH:
         pendingInputRef.current.starPunch = true;
         pendingInputRef.current.mash = true;
+        pendingInputRef.current.start = true;
         break;
     }
   }, []);
@@ -369,50 +378,78 @@ export const useGameLoop = () => {
 
         // If in PLAYING state, step engine
         if (gameState === GameState.PLAYING) {
-          const input: InputFrame = {
-            ...pendingInputRef.current,
-            block: isBlockHeldRef.current || pendingInputRef.current.block,
-          };
+          if (hitStopCounterRef.current > 0) {
+            hitStopCounterRef.current--;
+            // Still in hit-stop freeze: buffer any incoming inputs, do not call step()
+            bufferedInputRef.current = bufferInput(bufferedInputRef.current, {
+              ...pendingInputRef.current,
+              block: isBlockHeldRef.current || pendingInputRef.current.block,
+            });
+            pendingInputRef.current = {
+              block: isBlockHeldRef.current,
+            };
+          } else {
+            const input: InputFrame = {
+              ...bufferedInputRef.current,
+              ...pendingInputRef.current,
+              block: isBlockHeldRef.current || bufferedInputRef.current.block || pendingInputRef.current.block,
+            };
 
-          // Reset one-shot inputs after consuming
-          pendingInputRef.current = {
-            block: isBlockHeldRef.current,
-          };
+            // Reset buffers after consuming
+            bufferedInputRef.current = {};
+            pendingInputRef.current = {
+              block: isBlockHeldRef.current,
+            };
 
-          const prevState = engineStateRef.current;
-          const nextState = step(prevState, input);
-          engineStateRef.current = nextState;
+            const prevState = engineStateRef.current;
+            const nextState = step(prevState, input);
+            engineStateRef.current = nextState;
 
-          // Stop fight theme on knockdown, round end (BETWEEN_ROUNDS), or match over
-          if (
-            nextState.phase === 'KNOCKDOWN_COUNT' ||
-            nextState.phase === 'BETWEEN_ROUNDS' ||
-            nextState.phase === 'MATCH_OVER'
-          ) {
-            soundEngine.stopMusic();
-          }
+            // Stop fight theme on knockdown, round end (BETWEEN_ROUNDS), or match over
+            if (
+              nextState.phase === 'KNOCKDOWN_COUNT' ||
+              nextState.phase === 'BETWEEN_ROUNDS' ||
+              nextState.phase === 'MATCH_OVER'
+            ) {
+              soundEngine.stopMusic();
+            }
 
-          // Process sound and feedback events
-          if (nextState.events.length > 0) {
-            dispatchAudioEvents(nextState.events, nextState);
-          }
+            // Hit-stop freeze on landed blows / knockdowns (0 in fast/test mode)
+            const isFast = typeof window !== 'undefined' && (
+              window.location.search.includes('skip_entrance') ||
+              window.location.search.includes('test') ||
+              window.location.search.includes('debug=')
+            );
 
-          if (nextState.feedbackMessage) {
-            setFeedbackMessage(nextState.feedbackMessage);
-            feedbackTimerRef.current = 60;
-          }
+            if (!isFast && nextState.events.length > 0) {
+              const freeze = hitStopFrames(nextState.events);
+              if (freeze > 0) {
+                hitStopCounterRef.current = freeze;
+              }
+            }
 
-          // Check match conclusion
-          if (nextState.phase === 'MATCH_OVER' && prevState.phase !== 'MATCH_OVER') {
-            soundEngine.stopMusic();
-            if (nextState.winner === 'PLAYER') {
-              transitionTimerRef.current = 60;
-              nextTransitionStateRef.current = GameState.VICTORY;
-              soundEngine.playVictoryJingle();
-            } else {
-              transitionTimerRef.current = 60;
-              nextTransitionStateRef.current = GameState.GAME_OVER;
-              soundEngine.playDefeatJingle();
+            // Process sound and feedback events
+            if (nextState.events.length > 0) {
+              dispatchAudioEvents(nextState.events, nextState);
+            }
+
+            if (nextState.feedbackMessage) {
+              setFeedbackMessage(nextState.feedbackMessage);
+              feedbackTimerRef.current = 60;
+            }
+
+            // Check match conclusion
+            if (nextState.phase === 'MATCH_OVER' && prevState.phase !== 'MATCH_OVER') {
+              soundEngine.stopMusic();
+              if (nextState.winner === 'PLAYER') {
+                transitionTimerRef.current = 60;
+                nextTransitionStateRef.current = GameState.VICTORY;
+                soundEngine.playVictoryJingle();
+              } else {
+                transitionTimerRef.current = 60;
+                nextTransitionStateRef.current = GameState.GAME_OVER;
+                soundEngine.playDefeatJingle();
+              }
             }
           }
         }
@@ -460,19 +497,15 @@ export const useGameLoop = () => {
   };
 
   const advanceRound = useCallback(() => {
-    const next = { ...engineStateRef.current };
-    next.round++;
-    next.phase = 'ROUND_ACTIVE';
-    next.roundFrame = 0;
-    next.gameClockSeconds = 180;
-    next.player.knockdownsThisRound = 0;
-    next.opponent.knockdownsThisRound = 0;
-    const healed = Math.floor(next.player.maxHp * 0.35);
-    next.player.hp = Math.min(next.player.maxHp, next.player.hp + healed);
-    next.player.hearts = next.player.maxHearts;
-    next.player.isExhausted = false;
-    engineStateRef.current = next;
-    setGameState(GameState.PLAYING);
+    pendingInputRef.current.start = true;
+    if (
+      engineStateRef.current.phase === 'BETWEEN_ROUNDS' &&
+      engineStateRef.current.roundFrame >= ROUNDS.BETWEEN_ROUND_MIN_FRAMES
+    ) {
+      const next = step(engineStateRef.current, { start: true });
+      engineStateRef.current = next;
+      setGameState(GameState.PLAYING);
+    }
   }, []);
 
   return {

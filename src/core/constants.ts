@@ -93,6 +93,7 @@ export const ROUNDS = {
   GAME_CLOCK_SCALE: 1,             // 1 game second per 60 frames
   FRAMES_PER_GAME_SECOND: 60,
   BETWEEN_ROUND_FRAMES: 180,       // 3 seconds pause between rounds
+  BETWEEN_ROUND_MIN_FRAMES: 60,   // Minimum 60 frames before START can advance
   BETWEEN_ROUND_HEAL_RATIO: 0.4,   // regain 40% of max HP
 };
 

@@ -1,4 +1,5 @@
-import { FightState } from '../core/types';
+import { FightState, AttackType } from '../core/types';
+import { OPPONENT_ATTACKS } from '../core/constants';
 import { nesToRgba } from './nesPalette';
 import { drawRingBackground } from './sprites/ring';
 import { drawBitmapText, drawBitmapText2x } from './sprites/font';
@@ -184,14 +185,79 @@ function renderHud(
   }
 }
 
+export function computeScreenShake(state: FightState): { shakeX: number; shakeY: number } {
+  let shakeX = 0;
+  let shakeY = 0;
+
+  if (state.player.action === 'HIT' && (state.player.actionFrame || 0) < 8) {
+    shakeX = Math.floor((state.player.actionFrame || 0) / 2) % 2 === 0 ? 2 : -2;
+  }
+
+  const oppDown = state.opponent.action === 'KNOCKED_DOWN' || state.opponent.action === 'KO';
+  const playerDown = state.player.action === 'KNOCKED_DOWN' || state.player.action === 'KO';
+  const oppAf = state.opponent.actionFrame || 0;
+  const playerAf = state.player.actionFrame || 0;
+
+  if (oppDown && oppAf >= 10 && oppAf <= 21) {
+    shakeY = Math.floor((oppAf - 10) / 2) % 2 === 0 ? 3 : -3;
+  } else if (playerDown && playerAf >= 12 && playerAf <= 23) {
+    shakeY = Math.floor((playerAf - 12) / 2) % 2 === 0 ? 3 : -3;
+  }
+
+  return { shakeX, shakeY };
+}
+
+export function computeOpponentLunge(
+  action: string,
+  actionFrame: number
+): { lungeDx: number; lungeDy: number } {
+  if (!action.startsWith('PUNCH_')) {
+    return { lungeDx: 0, lungeDy: 0 };
+  }
+
+  let attackType: AttackType = 'JAB';
+  if (action.includes('HOOK')) {
+    attackType = 'HOOK';
+  } else if (action.includes('UPPERCUT')) {
+    attackType = 'UPPERCUT';
+  }
+
+  const config = OPPONENT_ATTACKS[attackType];
+  const activeFrames = config.activeFrames;
+  const recoveryFrames = config.recoveryFrames;
+  const totalFrames = activeFrames + recoveryFrames;
+
+  const isHookLeft = action === 'PUNCH_HOOK_LEFT';
+  const isHookRight = action === 'PUNCH_HOOK_RIGHT';
+  const baseDx = isHookLeft ? 10 : (isHookRight ? -10 : 0);
+  const baseDy = 8;
+
+  if (actionFrame <= activeFrames) {
+    return { lungeDx: baseDx, lungeDy: baseDy };
+  } else if (actionFrame <= totalFrames) {
+    const progress = (actionFrame - activeFrames) / recoveryFrames;
+    const factor = Math.max(0, 1 - progress);
+    const lungeDx = Math.round(baseDx * factor);
+    const lungeDy = Math.round(baseDy * factor);
+    return {
+      lungeDx: lungeDx === 0 ? 0 : lungeDx,
+      lungeDy: lungeDy === 0 ? 0 : lungeDy,
+    };
+  } else {
+    return { lungeDx: 0, lungeDy: 0 };
+  }
+}
+
 export function computeOpponentDraw(
   opponentId: string,
   action: string,
   actionFrame: number = 0,
-  frame: number = 0
+  frame: number = 0,
+  hitSide: 'LEFT' | 'RIGHT' = 'RIGHT',
+  hitTarget: 'HEAD' | 'BODY' = 'HEAD'
 ): { x: number; y: number; sprite: SpriteData; isHidden: boolean; effect: string } {
   const oppTransform = OPPONENT_POSES[action] || OPPONENT_POSES['IDLE'];
-  const oppSprite = getOpponentSprite(opponentId, action, actionFrame);
+  const oppSprite = getOpponentSprite(opponentId, action, actionFrame, hitSide, hitTarget);
   const anchor = getSpriteAnchor(oppSprite);
 
   const isDown = action === 'KNOCKED_DOWN' || action === 'KO';
@@ -216,17 +282,40 @@ export function computeOpponentDraw(
     }
   }
 
-  // Shake logic: function of actionFrame
-  let oppShakeX = 0;
-  if (oppTransform.shake > 0) {
-    const period = action === 'STUNNED' ? 8 : 4;
-    const sign = (Math.floor(actionFrame / (period / 2)) % 2 === 0) ? 1 : -1;
-    oppShakeX = sign * oppTransform.shake;
-  }
-
   // Breathing offset: 1px vertical breathing on frame 30 window (global frame counter per R1)
   const isBreathingFrame = Math.floor(frame / 30) % 2 === 1;
   const breathingDy = (action === 'IDLE' && isBreathingFrame) ? 1 : 0;
+
+  // Directional hit reaction displacement
+  let hitDx = 0;
+  let hitDy = 0;
+  let effect = oppTransform.effect;
+
+  if (action === 'HIT') {
+    if (hitTarget === 'BODY') {
+      effect = 'spark-body';
+      if (actionFrame <= 5) {
+        hitDy = 3;
+      } else if (actionFrame <= 10) {
+        hitDy = Math.round(3 * (1 - (actionFrame - 5) / 5));
+      } else {
+        hitDy = 0;
+      }
+    } else {
+      effect = 'spark-head';
+      const dir = hitSide === 'LEFT' ? 1 : -1;
+      if (actionFrame <= 5) {
+        hitDx = dir * 6;
+      } else if (actionFrame <= 10) {
+        hitDx = Math.round(dir * 6 * (1 - (actionFrame - 5) / 5));
+      } else {
+        hitDx = 0;
+      }
+    }
+  }
+
+  // Punch lunge offset
+  const { lungeDx, lungeDy } = computeOpponentLunge(action, actionFrame);
 
   let x: number;
   let y: number;
@@ -234,9 +323,8 @@ export function computeOpponentDraw(
   if (isDown) {
     if (actionFrame < 10) {
       // frames 0-9: HIT frame moved up and back (dy -4)
-      const baseOppDy = oppTransform.dy;
-      x = Math.round(128 - anchor.headCenterX) + oppTransform.dx + oppShakeX;
-      y = 190 - oppSprite.height + 1 + baseOppDy - 4;
+      x = Math.round(128 - anchor.headCenterX) + hitDx;
+      y = 190 - oppSprite.height + 1 - 4;
     } else {
       // frames 10+: lying frame with bottom row at y = 192 and center opaque x at 128 ± 4.
       // Drops in from y-offset -12 over frames 10-15, with a 2 px bounce on frames 16-19, then rests.
@@ -253,13 +341,24 @@ export function computeOpponentDraw(
       y = 192 - anchor.lastRow + dropOffset;
     }
   } else {
-    // Standing frames: bottom row at y = 190, head at x = 128 ± 2 + dx
-    const baseOppDy = action === 'TAUNT' ? 0 : oppTransform.dy;
-    x = Math.round(128 - anchor.headCenterX) + oppTransform.dx + oppShakeX;
-    y = 190 - oppSprite.height + 1 + baseOppDy + breathingDy + tauntBounceDy;
+    // Standing frames
+    if (action === 'HIT') {
+      x = Math.round(128 - anchor.headCenterX) + hitDx;
+      y = 190 - oppSprite.height + 1 + hitDy;
+    } else if (action.startsWith('PUNCH_')) {
+      x = Math.round(128 - anchor.headCenterX) + lungeDx;
+      y = 190 - oppSprite.height + 1 + lungeDy + breathingDy + tauntBounceDy;
+    } else {
+      const baseOppDy = action === 'TAUNT' ? 0 : oppTransform.dy;
+      const localShakeX = (action === 'STUNNED' && oppTransform.shake > 0)
+        ? ((Math.floor(actionFrame / 4) % 2 === 0 ? 1 : -1) * oppTransform.shake)
+        : 0;
+      x = Math.round(128 - anchor.headCenterX) + oppTransform.dx + localShakeX;
+      y = 190 - oppSprite.height + 1 + baseOppDy + breathingDy + tauntBounceDy;
+    }
   }
 
-  return { x, y, sprite: oppSprite, isHidden: isKoHidden, effect: oppTransform.effect };
+  return { x, y, sprite: oppSprite, isHidden: isKoHidden, effect };
 }
 
 export function renderFrame(
@@ -271,7 +370,9 @@ export function renderFrame(
   const frame = state.frame;
   const flash = Math.floor(frame / 8) % 2 === 0;
 
-  // 1. Draw Ring Background & Crowd
+  const { shakeX, shakeY } = computeScreenShake(state);
+
+  // 1. Draw Ring Background & Crowd (with screen shake)
   const setPixel = (x: number, y: number, nesColor: number) => {
     const [r, g, b] = nesToRgba(nesColor);
     const idx = (y * CANVAS_WIDTH + x) * 4;
@@ -281,9 +382,9 @@ export function renderFrame(
     data[idx + 3] = 255;
   };
 
-  drawRingBackground(setPixel, frame);
+  drawRingBackground(setPixel, frame, shakeX, shakeY);
 
-  // 2. Draw HUD (y: 0..47)
+  // 2. Draw HUD (y: 0..47) - UNSHAKEN
   renderHud(data, state, flash);
 
   // 3. Draw Referee (if KNOCKDOWN_COUNT phase or MATCH_OVER)
@@ -292,12 +393,19 @@ export function renderFrame(
 
   if (inKnockdown || isMatchOver) {
     const refSprite = inKnockdown ? REFEREE_SPRITES.COUNT : REFEREE_SPRITES.STAND;
-    blitSprite(data, refSprite, 48, 88);
+    blitSprite(data, refSprite, 48 + shakeX, 88 + shakeY);
   }
 
   // 4. Draw Opponent
   const oppActionFrame = state.opponent.actionFrame || 0;
-  const oppDraw = computeOpponentDraw(state.opponentId, state.opponent.action, oppActionFrame, frame);
+  const oppDraw = computeOpponentDraw(
+    state.opponentId,
+    state.opponent.action,
+    oppActionFrame,
+    frame,
+    state.opponent.lastHitSide,
+    state.opponent.lastHitTarget
+  );
 
   if (!oppDraw.isHidden) {
     const starFlashActive =
@@ -306,18 +414,18 @@ export function renderFrame(
       state.opponent.action !== 'KO';
     const oppOverride = (state.opponent.starOpportunity && flash && starFlashActive) ? 0x20 : undefined;
 
-    blitSprite(data, oppDraw.sprite, oppDraw.x, oppDraw.y, oppOverride);
+    blitSprite(data, oppDraw.sprite, oppDraw.x + shakeX, oppDraw.y + shakeY, oppOverride);
 
     // Opponent Effect Sprites (spark / stars)
     if (oppDraw.effect === 'spark-head') {
-      blitSprite(data, SPARK_SPRITE, oppDraw.x + Math.floor(oppDraw.sprite.width / 2) - 4, oppDraw.y + 16);
+      blitSprite(data, SPARK_SPRITE, oppDraw.x + shakeX + Math.floor(oppDraw.sprite.width / 2) - 4, oppDraw.y + shakeY + 16);
     } else if (oppDraw.effect === 'spark-body') {
-      blitSprite(data, SPARK_SPRITE, oppDraw.x + Math.floor(oppDraw.sprite.width / 2) - 4, oppDraw.y + 50);
+      blitSprite(data, SPARK_SPRITE, oppDraw.x + shakeX + Math.floor(oppDraw.sprite.width / 2) - 4, oppDraw.y + 50);
     } else if (oppDraw.effect === 'stars') {
       const angle = (oppActionFrame * 0.15) % (Math.PI * 2);
       const starX = oppDraw.x + Math.floor(oppDraw.sprite.width / 2) + Math.round(Math.cos(angle) * 16) - 4;
       const starY = oppDraw.y + Math.round(Math.sin(angle) * 6) - 8;
-      blitSprite(data, STAR_SPRITE, starX, starY);
+      blitSprite(data, STAR_SPRITE, starX + shakeX, starY + shakeY);
     }
   }
 
@@ -325,8 +433,8 @@ export function renderFrame(
   const playerActionFrame = state.player.actionFrame || 0;
   const playerDraw = computePlayerDraw(state);
   const playerSprite = playerDraw.sprite;
-  const playerX = playerDraw.x;
-  const playerY = playerDraw.y;
+  const playerX = playerDraw.x + shakeX;
+  const playerY = playerDraw.y + shakeY;
 
   blitSprite(data, playerSprite, playerX, playerY);
 

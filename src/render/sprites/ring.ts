@@ -32,12 +32,35 @@ export const RING_COLORS = {
 // Procedural crowd rows for buffer caching or direct scanline render
 export function drawRingBackground(
   setPixel: (x: number, y: number, nesColor: number) => void,
-  frameTick: number = 0
+  frameTick: number = 0,
+  shakeX: number = 0,
+  shakeY: number = 0
 ) {
-  // 1. Black ceiling / HUD background (y: 0..47)
+  // 1. Black ceiling / HUD background (y: 0..47) - UNSHAKEN
   for (let y = 0; y < 48; y++) {
     for (let x = 0; x < 256; x++) {
       setPixel(x, y, 0x0F);
+    }
+  }
+
+  // Helper to draw ring pixels with shake offset (clamped to y >= 48)
+  const setRingPixel = (x: number, y: number, nesColor: number) => {
+    const sx = x + shakeX;
+    const sy = y + shakeY;
+    if (sx >= 0 && sx < 256 && sy >= 48 && sy < 240) {
+      setPixel(sx, sy, nesColor);
+    }
+  };
+
+  // Base fill for ring area (y: 48..240) in case shake exposes edges
+  for (let y = 48; y < 88; y++) {
+    for (let x = 0; x < 256; x++) {
+      setPixel(x, y, RING_COLORS.CROWD_BG);
+    }
+  }
+  for (let y = 88; y < 240; y++) {
+    for (let x = 0; x < 256; x++) {
+      setPixel(x, y, RING_COLORS.MAT_TOP);
     }
   }
 
@@ -48,7 +71,7 @@ export function drawRingBackground(
       // Subtle crowd bobbing or camera flash
       const isFlash = (frameTick % 60 < 2) && (x % 37 === 0) && (y % 7 === 0);
       if (isFlash) {
-        setPixel(x, y, 0x20); // Camera flash in crowd
+        setRingPixel(x, y, 0x20); // Camera flash in crowd
         continue;
       }
 
@@ -60,9 +83,9 @@ export function drawRingBackground(
       // Draw silhouette head
       if (headY >= 2 && headY <= 7 && headX >= 1 && headX <= 6) {
         const shade = ((headCol + headRow) % 2 === 0) ? RING_COLORS.CROWD_DARK : RING_COLORS.CROWD_LIGHT;
-        setPixel(x, y, shade);
+        setRingPixel(x, y, shade);
       } else {
-        setPixel(x, y, RING_COLORS.CROWD_BG);
+        setRingPixel(x, y, RING_COLORS.CROWD_BG);
       }
     }
   }
@@ -73,9 +96,9 @@ export function drawRingBackground(
       // Perspective ring mat lines or solid Punch-Out blue mat
       if (y === 88 || y === 89) {
         // Mat top border
-        setPixel(x, y, 0x0F);
+        setRingPixel(x, y, 0x0F);
       } else {
-        setPixel(x, y, RING_COLORS.MAT_TOP);
+        setRingPixel(x, y, RING_COLORS.MAT_TOP);
       }
     }
   }
@@ -83,29 +106,23 @@ export function drawRingBackground(
   // 4. Ring Posts (Left: x: 18..24, Right: x: 232..238)
   for (let y = 72; y < 140; y++) {
     for (let x = 18; x <= 24; x++) {
-      setPixel(x, y, (y % 6 < 3) ? RING_COLORS.POST : RING_COLORS.POST_WRAP);
+      setRingPixel(x, y, (y % 6 < 3) ? RING_COLORS.POST : RING_COLORS.POST_WRAP);
     }
     for (let x = 232; x <= 238; x++) {
-      setPixel(x, y, (y % 6 < 3) ? RING_COLORS.POST : RING_COLORS.POST_WRAP);
+      setRingPixel(x, y, (y % 6 < 3) ? RING_COLORS.POST : RING_COLORS.POST_WRAP);
     }
   }
 
   // 5. 3 Ropes across ring (horizontal lines at y: 88, y: 104, y: 120)
-  // Top Rope: y = 88..90 (Red)
   for (let x = 24; x < 232; x++) {
-    setPixel(x, 88, RING_COLORS.ROPE_TOP);
-    setPixel(x, 89, 0x0F); // Rope drop shadow
-  }
-
-  // Middle Rope: y = 104..106 (White)
-  for (let x = 24; x < 232; x++) {
-    setPixel(x, 104, RING_COLORS.ROPE_MID);
-    setPixel(x, 105, 0x0F);
-  }
-
-  // Bottom Rope: y = 120..122 (Blue)
-  for (let x = 24; x < 232; x++) {
-    setPixel(x, 120, RING_COLORS.ROPE_BOT);
-    setPixel(x, 121, 0x0F);
+    // Top Rope: y = 88..90 (Red)
+    setRingPixel(x, 88, RING_COLORS.ROPE_TOP);
+    setRingPixel(x, 89, 0x0F); // Rope drop shadow
+    // Middle Rope: y = 104..106 (White)
+    setRingPixel(x, 104, RING_COLORS.ROPE_MID);
+    setRingPixel(x, 105, 0x0F);
+    // Bottom Rope: y = 120..122 (Blue)
+    setRingPixel(x, 120, RING_COLORS.ROPE_BOT);
+    setRingPixel(x, 121, 0x0F);
   }
 }
