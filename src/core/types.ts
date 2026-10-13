@@ -32,7 +32,8 @@ export type OpponentActionType =
   | 'HIT'
   | 'STUNNED'
   | 'KNOCKED_DOWN'
-  | 'KO';
+  | 'KO'
+  | 'TAUNT';
 
 export type AttackType = 'JAB' | 'HOOK' | 'UPPERCUT';
 

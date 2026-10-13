@@ -1,7 +1,7 @@
 import { FightState } from '../core/types';
 import { NES_PALETTE, nesToRgba } from './nesPalette';
 import { drawRingBackground } from './sprites/ring';
-import { drawBitmapText } from './sprites/font';
+import { drawBitmapText, drawBitmapText2x } from './sprites/font';
 import { getOpponentSprite, resolvePlayerSprite, OPPONENT_POSES, PLAYER_POSES } from './poses';
 import { REFEREE_SPRITES, getLargeCountDigitSprite } from './sprites/referee';
 import { SpriteData } from './sprites/types';
@@ -180,64 +180,89 @@ export function renderFrame(
   // 4. Draw Opponent
   // Opponent sprite is 112-150px tall (e.g. 140px tall).
   // Positioned below HUD (y >= 48) at y = 50, centered at x: 128 ± 8.
+  const oppActionFrame = state.opponent.actionFrame || 0;
   const oppTransform = OPPONENT_POSES[state.opponent.action] || OPPONENT_POSES['IDLE'];
-  const oppSprite = getOpponentSprite(state.opponentId, state.opponent.action, frame);
+  const oppSprite = getOpponentSprite(state.opponentId, state.opponent.action, oppActionFrame);
 
-  // Fall logic: slide down over ~30 frames until at most its top 40 rows remain above ring floor (y=190)
+  // Fall logic: slide down over actionFrame 0-30 until at most its top 40 rows remain above ring floor (y=190)
   let fallDy = 0;
   if (oppTransform.fall) {
-    const actFrame = state.opponent.actionFrame || 0;
-    const fallProgress = Math.min(1, actFrame / 30);
+    const fallProgress = Math.min(1, oppActionFrame / 30);
     // 50 + 100 = 150 -> leaves top 40 rows above y=190
     fallDy = Math.floor(fallProgress * 100);
   }
 
-  // Shake logic
+  // KO blink: from actionFrame 31, KO blinks: hidden on 4-frame windows, every other window
+  // e.g. [31, 34]: Math.floor((31-31)/4) = 0 (even -> visible), [35, 38]: 1 (odd -> hidden), etc.
+  let isKoHidden = false;
+  if (state.opponent.action === 'KO' && oppActionFrame >= 31) {
+    const blinkWindow = Math.floor((oppActionFrame - 31) / 4);
+    if (blinkWindow % 2 === 1) {
+      isKoHidden = true;
+    }
+  }
+
+  // Taunt bounce: oscillate dy between 0 and -6 over a 16-frame period of actionFrame
+  let tauntBounceDy = 0;
+  if (state.opponent.action === 'TAUNT') {
+    // Phase 0..15: 0..7 goes up 0 to -6, 8..15 goes back down -6 to 0
+    const phase = oppActionFrame % 16;
+    if (phase < 8) {
+      tauntBounceDy = -Math.round((phase / 7) * 6);
+    } else {
+      tauntBounceDy = -Math.round(((15 - phase) / 7) * 6);
+    }
+  }
+
+  // Shake logic: function of actionFrame
   let oppShakeX = 0;
   if (oppTransform.shake > 0) {
     const period = state.opponent.action === 'STUNNED' ? 8 : 4;
-    const sign = (Math.floor(frame / (period / 2)) % 2 === 0) ? 1 : -1;
+    const sign = (Math.floor(oppActionFrame / (period / 2)) % 2 === 0) ? 1 : -1;
     oppShakeX = sign * oppTransform.shake;
   }
 
-  // Breathing offset: 1px vertical breathing on frame 30 window
+  // Breathing offset: 1px vertical breathing on frame 30 window (global frame counter per R1)
   const isBreathingFrame = Math.floor(frame / 30) % 2 === 1;
   const breathingDy = (state.opponent.action === 'IDLE' && isBreathingFrame) ? 1 : 0;
 
+  const baseOppDy = state.opponent.action === 'TAUNT' ? 0 : oppTransform.dy;
   const oppX = Math.round(128 - oppSprite.width / 2) + oppTransform.dx + oppShakeX;
-  const oppY = 50 + oppTransform.dy + fallDy + breathingDy;
+  const oppY = 50 + baseOppDy + fallDy + breathingDy + tauntBounceDy;
 
-  // Star opportunity flash effect on opponent
-  const oppOverride = (state.opponent.starOpportunity && flash) ? 0x20 : undefined;
-  blitSprite(data, oppSprite, oppX, oppY, oppOverride);
+  if (!isKoHidden) {
+    // Star opportunity flash effect on opponent
+    const oppOverride = (state.opponent.starOpportunity && flash) ? 0x20 : undefined;
+    blitSprite(data, oppSprite, oppX, oppY, oppOverride);
 
-  // Opponent Effect Sprites (spark / stars)
-  if (oppTransform.effect === 'spark-head') {
-    blitSprite(data, SPARK_SPRITE, oppX + Math.floor(oppSprite.width / 2) - 4, oppY + 16);
-  } else if (oppTransform.effect === 'spark-body') {
-    blitSprite(data, SPARK_SPRITE, oppX + Math.floor(oppSprite.width / 2) - 4, oppY + 50);
-  } else if (oppTransform.effect === 'stars') {
-    // Circling stars above head
-    const angle = (frame * 0.15) % (Math.PI * 2);
-    const starX = oppX + Math.floor(oppSprite.width / 2) + Math.round(Math.cos(angle) * 16) - 4;
-    const starY = oppY + Math.round(Math.sin(angle) * 6) - 8;
-    blitSprite(data, STAR_SPRITE, starX, starY);
+    // Opponent Effect Sprites (spark / stars)
+    if (oppTransform.effect === 'spark-head') {
+      blitSprite(data, SPARK_SPRITE, oppX + Math.floor(oppSprite.width / 2) - 4, oppY + 16);
+    } else if (oppTransform.effect === 'spark-body') {
+      blitSprite(data, SPARK_SPRITE, oppX + Math.floor(oppSprite.width / 2) - 4, oppY + 50);
+    } else if (oppTransform.effect === 'stars') {
+      // Circling stars above head using actionFrame
+      const angle = (oppActionFrame * 0.15) % (Math.PI * 2);
+      const starX = oppX + Math.floor(oppSprite.width / 2) + Math.round(Math.cos(angle) * 16) - 4;
+      const starY = oppY + Math.round(Math.sin(angle) * 6) - 8;
+      blitSprite(data, STAR_SPRITE, starX, starY);
+    }
   }
 
   // 5. Draw Player (Seen from behind, small at lower center overlapping opponent's lower body)
+  const playerActionFrame = state.player.actionFrame || 0;
   const playerTransform = PLAYER_POSES[state.player.action] || PLAYER_POSES['IDLE'];
   const playerSprite = resolvePlayerSprite(state.player.action, state.player.isExhausted);
 
   let pShakeX = 0;
   if (playerTransform.shake > 0) {
-    const sign = (Math.floor(frame / 2) % 2 === 0) ? 1 : -1;
+    const sign = (Math.floor(playerActionFrame / 2) % 2 === 0) ? 1 : -1;
     pShakeX = sign * playerTransform.shake;
   }
 
   let pFallDy = 0;
   if (playerTransform.fall) {
-    const pActFrame = state.player.actionFrame || 0;
-    pFallDy = Math.min(30, Math.floor(pActFrame * 1.5));
+    pFallDy = Math.min(30, Math.floor(playerActionFrame * 1.5));
   }
 
   const playerX = Math.round(128 - playerSprite.width / 2) + playerTransform.dx + pShakeX;
@@ -245,9 +270,50 @@ export function renderFrame(
 
   blitSprite(data, playerSprite, playerX, playerY);
 
-  // 6. Hit feedback flash (white/red flash on hit)
-  if (state.player.action === 'HIT' && flash) {
+  // 6. Hit feedback flash (white/red flash on hit, first 4 frames of actionFrame)
+  if (state.player.action === 'HIT' && playerActionFrame <= 3) {
     blitSprite(data, playerSprite, playerX, playerY, 0x20);
+  }
+
+  // 7. In-fight canvas feedback messages (Requirement 10)
+  // When feedbackMessage is set during a fight, drawn in 8x8 font at 2x, centered, inside y 52-80 on a black backing bar
+  if (state.feedbackMessage) {
+    const msg = state.feedbackMessage;
+    const charWidth = 16; // 8 * 2
+    const textWidth = msg.length * charWidth;
+    const textHeight = 16; // 8 * 2
+    const startX = Math.max(0, Math.round((CANVAS_WIDTH - textWidth) / 2));
+    const startY = 56; // Centered inside 52..80 (total height 28, text height 16, padding top/bot 6)
+
+    // Black backing bar
+    const barPadX = 6;
+    const barLeft = Math.max(0, startX - barPadX);
+    const barRight = Math.min(CANVAS_WIDTH - 1, startX + textWidth + barPadX);
+    const barTop = 52;
+    const barBottom = 76;
+
+    for (let by = barTop; by <= barBottom; by++) {
+      for (let bx = barLeft; bx <= barRight; bx++) {
+        const idx = (by * CANVAS_WIDTH + bx) * 4;
+        data[idx] = 0;
+        data[idx + 1] = 0;
+        data[idx + 2] = 0;
+        data[idx + 3] = 255;
+      }
+    }
+
+    const setMsgPixel = (x: number, y: number, nesColor: number) => {
+      if (x < 0 || x >= CANVAS_WIDTH || y < 0 || y >= CANVAS_HEIGHT) return;
+      const [r, g, b] = nesToRgba(nesColor);
+      const idx = (y * CANVAS_WIDTH + x) * 4;
+      data[idx] = r;
+      data[idx + 1] = g;
+      data[idx + 2] = b;
+      data[idx + 3] = 255;
+    };
+
+    // Draw text in NES yellow/gold (0x28) or white (0x20)
+    drawBitmapText2x(setMsgPixel, msg, startX, startY, 0x28);
   }
 
   // Blit final pixel buffer to canvas

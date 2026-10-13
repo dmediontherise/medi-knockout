@@ -431,6 +431,16 @@ export const FONT_8X8: Record<string, string[]> = {
     '.#....#.',
     '........',
   ],
+  '?': [
+    '..####..',
+    '.#....#.',
+    '.....#..',
+    '...##...',
+    '...##...',
+    '........',
+    '...##...',
+    '........',
+  ],
 };
 
 export function drawBitmapText(
@@ -456,6 +466,35 @@ export function drawBitmapText(
       }
     }
     curX += 8;
+  }
+}
+
+export function drawBitmapText2x(
+  setPixel: (x: number, y: number, nesColor: number) => void,
+  text: string,
+  startX: number,
+  startY: number,
+  nesColor: number
+) {
+  let curX = startX;
+  for (let i = 0; i < text.length; i++) {
+    let char = text[i].toUpperCase();
+    if (char === '\x03') char = '♥';
+    if (char === '\x04') char = '★';
+
+    const glyph = FONT_8X8[char] || FONT_8X8[' '];
+    for (let gy = 0; gy < 8; gy++) {
+      const row = glyph[gy];
+      for (let gx = 0; gx < 8; gx++) {
+        if (row && row[gx] === '#') {
+          setPixel(curX + gx * 2, startY + gy * 2, nesColor);
+          setPixel(curX + gx * 2 + 1, startY + gy * 2, nesColor);
+          setPixel(curX + gx * 2, startY + gy * 2 + 1, nesColor);
+          setPixel(curX + gx * 2 + 1, startY + gy * 2 + 1, nesColor);
+        }
+      }
+    }
+    curX += 16;
   }
 }
 

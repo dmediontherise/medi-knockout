@@ -83,7 +83,7 @@ export const OPPONENT_POSES: Record<OpponentActionType | string, PoseTransform> 
     fall: false,
   },
   TELL_HOOK_LEFT: {
-    dx: -12,
+    dx: -16,
     dy: -2,
     flipX: false,
     palette: 'flash',
@@ -92,7 +92,7 @@ export const OPPONENT_POSES: Record<OpponentActionType | string, PoseTransform> 
     fall: false,
   },
   TELL_HOOK_RIGHT: {
-    dx: 12,
+    dx: 16,
     dy: -2,
     flipX: true,
     palette: 'flash',
@@ -102,7 +102,7 @@ export const OPPONENT_POSES: Record<OpponentActionType | string, PoseTransform> 
   },
   TELL_UPPERCUT_LEFT: {
     dx: -3,
-    dy: 10,
+    dy: 14,
     flipX: false,
     palette: 'flash',
     effect: 'none',
@@ -111,7 +111,7 @@ export const OPPONENT_POSES: Record<OpponentActionType | string, PoseTransform> 
   },
   TELL_UPPERCUT_RIGHT: {
     dx: 3,
-    dy: 10,
+    dy: 14,
     flipX: true,
     palette: 'flash',
     effect: 'none',
@@ -276,19 +276,22 @@ export function applyPaletteEffect(sprite: SpriteData, effect: PaletteEffect): S
 export function getOpponentSprite(
   opponentId: string,
   action: OpponentActionType | string,
-  frame: number = 0
+  actionFrame: number = 0
 ): SpriteData {
   const base = IDLE_BASES[opponentId] || IDLE_BASES['aint_man'];
   const transform = OPPONENT_POSES[action] || OPPONENT_POSES['IDLE'];
 
-  // Flashing windows for jab tell or taunt: alternate 4-frame windows
+  // Flashing windows based on actionFrame
   let activePalette = transform.palette;
   if (action === 'TELL_JAB_LEFT' || action === 'TELL_JAB_RIGHT') {
-    const isFlashWindow = Math.floor(frame / 4) % 2 === 0;
+    // Flash on actionFrame 0-3, 8-11 and 16-19 (on/off in 4-frame windows from start of tell)
+    const isFlashWindow = (actionFrame >= 0 && actionFrame <= 3) ||
+                          (actionFrame >= 8 && actionFrame <= 11) ||
+                          (actionFrame >= 16 && actionFrame <= 19);
     activePalette = isFlashWindow ? 'flash' : 'normal';
   } else if (action === 'HIT') {
-    // Flash for first 4 frames
-    activePalette = (frame % 8 < 4) ? 'flash' : 'normal';
+    // Flash on actionFrame 0-3 only, then normal palette
+    activePalette = (actionFrame >= 0 && actionFrame <= 3) ? 'flash' : 'normal';
   }
 
   // Horizontal flip

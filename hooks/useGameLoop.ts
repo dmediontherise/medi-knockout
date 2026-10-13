@@ -106,6 +106,17 @@ export const useGameLoop = () => {
   const accumulatorRef = useRef<number>(0);
   const lastTimeRef = useRef<number | null>(null);
 
+  // Auto-start match if ?debug=lowhp is provided on mount
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const params = new URLSearchParams(window.location.search);
+    const debug = params.get('debug');
+    const oppParam = params.get('opp');
+    if (debug === 'lowhp') {
+      resetGame(oppParam || 'aint_man');
+    }
+  }, []);
+
   // Play audio events emitted by the engine
   const dispatchAudioEvents = (events: SoundEvent[], state: FightState) => {
     for (const evt of events) {
@@ -189,7 +200,16 @@ export const useGameLoop = () => {
     const opp = ROSTER[nextIndex];
     // Seed using frame counter or initial seed
     const initialSeed = ((engineStateRef.current.seed * 31 + nextIndex + 1) & 0x7fffffff) >>> 0;
-    engineStateRef.current = createFight(opp.id, initialSeed);
+    const fight = createFight(opp.id, initialSeed);
+
+    if (typeof window !== 'undefined') {
+      const params = new URLSearchParams(window.location.search);
+      if (params.get('debug') === 'lowhp') {
+        fight.opponent.hp = 1;
+      }
+    }
+
+    engineStateRef.current = fight;
 
     pendingInputRef.current = {};
     isBlockHeldRef.current = false;
@@ -200,10 +220,11 @@ export const useGameLoop = () => {
     setGameState(GameState.ENTRANCE);
     soundEngine.playEntrance(opp.id);
 
-    // Check if skip_entrance or test flag is present in window.location
+    // Check if skip_entrance, test, or debug flag is present in window.location
     const isFast = typeof window !== 'undefined' && (
       window.location.search.includes('skip_entrance') ||
-      window.location.search.includes('test')
+      window.location.search.includes('test') ||
+      window.location.search.includes('debug=')
     );
 
     // Entrance lasts 240 frames (~4.0s), or 1 frame in fast/test mode

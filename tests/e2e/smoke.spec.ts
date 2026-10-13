@@ -78,6 +78,17 @@ for (const opponentId of OPPONENT_IDS) {
       });
       expect(hasHudPixels).toBe(true);
 
+      // Requirement 10: No DOM element shows feedbackMessage text while data-game-state="PLAYING"
+      // Assert no element containing OUCH, FIGHT, GET UP or ROUND text is visible in the DOM during PLAYING
+      const forbiddenPatterns = ['OUCH', 'FIGHT', 'GET UP', 'ROUND'];
+      for (const pattern of forbiddenPatterns) {
+        const matches = await page.locator(`text=${pattern}`).all();
+        for (const loc of matches) {
+          const isVis = await loc.isVisible();
+          expect(isVis, `DOM element containing "${pattern}" should not be visible during PLAYING`).toBe(false);
+        }
+      }
+
       // Save screenshot for desktop view (or default)
       if (vp.name === 'desktop') {
         const screenshotsDir = path.resolve(process.cwd(), 'screenshots');

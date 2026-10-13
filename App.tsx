@@ -31,14 +31,18 @@ const App: React.FC = () => {
     const poseOpponent = params.get('pose');
     const oppAction = params.get('action');
     const playerAction = params.get('player');
+    const frameParam = params.get('frame');
 
     if (poseOpponent) {
       const preview = createFight(poseOpponent, 12345);
+      const actionFrameNum = frameParam !== null ? parseInt(frameParam, 10) : 0;
       if (oppAction) {
         preview.opponent.action = oppAction as OpponentActionType;
+        preview.opponent.actionFrame = actionFrameNum;
       }
       if (playerAction) {
         preview.player.action = playerAction as ActionType;
+        preview.player.actionFrame = actionFrameNum;
       }
       setPosePreviewState(preview);
     }
@@ -71,10 +75,13 @@ const App: React.FC = () => {
   // Determine current effective state for rendering
   const activeState = posePreviewState || fightState;
   const isPlayerHit = activeState.player.action === 'HIT';
+  const effectiveGameState = posePreviewState ? 'PLAYING' : GameState[gameState];
+  const isPlaying = effectiveGameState === 'PLAYING';
 
   return (
     <div 
-      data-game-state={posePreviewState ? 'PLAYING' : GameState[gameState]}
+      data-game-state={effectiveGameState}
+      data-referee-count={activeState.referee.count}
       className={`fixed inset-0 w-full h-[100dvh] bg-slate-950 overflow-hidden flex flex-col items-center select-none touch-none ${isPlayerHit ? 'animate-shake' : ''}`}
     >
       {/* CSS Shake Animation */}
@@ -117,8 +124,8 @@ const App: React.FC = () => {
         </div>
       )}
 
-      {/* Feedback message banner */}
-      {feedbackMessage && (
+      {/* Feedback message banner (only shown outside of PLAYING fights per Requirement 10) */}
+      {!isPlaying && feedbackMessage && (
         <div className="absolute top-16 text-yellow-400 text-2xl md:text-5xl animate-bounce font-bold drop-shadow-[0_4px_0_rgba(0,0,0,1)] stroke-black tracking-tighter whitespace-nowrap z-50 pointer-events-none">
           {feedbackMessage}
         </div>

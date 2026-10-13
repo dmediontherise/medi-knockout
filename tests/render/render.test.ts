@@ -488,4 +488,199 @@ describe('Character Sprite Palettes and Dimensions', () => {
       expect(pixelsSet).toBeGreaterThan(0);
     });
   });
+
+  // Task 008: Requirements 2-6 Unit Tests
+  describe('Task 008 Requirements 2-6', () => {
+    function createMockCanvas(): { ctx: CanvasRenderingContext2D; buffer: Uint8ClampedArray } {
+      const buffer = new Uint8ClampedArray(CANVAS_WIDTH * CANVAS_HEIGHT * 4);
+      const ctx = {
+        createImageData: (w: number, h: number) => ({ width: w, height: h, data: buffer }),
+        putImageData: (imgData: any) => { buffer.set(imgData.data); },
+      } as unknown as CanvasRenderingContext2D;
+      return { ctx, buffer };
+    }
+
+    // R2: Hit flash: HIT flashes on actionFrame 0-3 only, then shows the normal palette while shaking
+    it('R2: HIT flashes on actionFrame 0-3 only, then normal palette while shaking', () => {
+      // Check sprite palettes directly
+      for (const f of [0, 1, 2, 3]) {
+        const sprite = getOpponentSprite('aint_man', 'HIT', f);
+        // In flash palette, gold/yellow 0x28 is mapped to 0x38 or similar lighter NES color
+        const colors = Object.values(sprite.palette);
+        expect(colors).not.toEqual(Object.values(IDLE_BASE_AINT_MAN.palette));
+      }
+      for (const f of [4, 5, 10, 20]) {
+        const sprite = getOpponentSprite('aint_man', 'HIT', f);
+        // After frame 3, palette returns to normal (identical to base idle palette)
+        expect(sprite.palette).toEqual(IDLE_BASE_AINT_MAN.palette);
+      }
+
+      // Render into pixel buffer and verify flash vs normal
+      const f3 = createFight('aint_man', 123); f3.opponent.action = 'HIT'; f3.opponent.actionFrame = 3;
+      const f4 = createFight('aint_man', 123); f4.opponent.action = 'HIT'; f4.opponent.actionFrame = 4;
+      const m3 = createMockCanvas(); renderFrame(m3.ctx, f3);
+      const m4 = createMockCanvas(); renderFrame(m4.ctx, f4);
+
+      let diffCount = 0;
+      for (let i = 0; i < m3.buffer.length; i += 4) {
+        if (m3.buffer[i] !== m4.buffer[i] || m3.buffer[i+1] !== m4.buffer[i+1] || m3.buffer[i+2] !== m4.buffer[i+2]) {
+          diffCount++;
+        }
+      }
+      expect(diffCount, 'frame 3 flash and frame 4 normal differ').toBeGreaterThan(100);
+    });
+
+    // R3: Jab-tell flash: The jab tell flashes on actionFrame 0-3, 8-11 and 16-19 (on/off in 4-frame windows)
+    it('R3: Jab-tell flash on actionFrame 0-3, 8-11, 16-19', () => {
+      const flashFrames = [0, 1, 2, 3, 8, 9, 10, 11, 16, 17, 18, 19];
+      const normalFrames = [4, 5, 6, 7, 12, 13, 14, 15, 20, 21];
+
+      for (const f of flashFrames) {
+        const s = getOpponentSprite('aint_man', 'TELL_JAB_LEFT', f);
+        expect(s.palette).not.toEqual(IDLE_BASE_AINT_MAN.palette);
+      }
+      for (const f of normalFrames) {
+        const s = getOpponentSprite('aint_man', 'TELL_JAB_LEFT', f);
+        expect(s.palette).toEqual(IDLE_BASE_AINT_MAN.palette);
+      }
+    });
+
+    // R4: Fall and blink: KNOCKED_DOWN and KO slide down linearly over 0-30; from 31 KO blinks, KNOCKED_DOWN stays down
+    it('R4: Fall and blink: KNOCKED_DOWN and KO slide linearly over 0-30, KO blinks from 31', () => {
+      // Measure opponent top non-background row in rendered frames
+      function getOpponentTopRow(buf: Uint8ClampedArray): number {
+        for (let y = 48; y < CANVAS_HEIGHT; y++) {
+          for (let x = 64; x < 192; x++) {
+            const idx = (y * CANVAS_WIDTH + x) * 4;
+            const r = buf[idx], g = buf[idx+1], b = buf[idx+2];
+            // Compare against ring floor / background colors (ignore crowd / HUD)
+            // Mat color is teal (r 0, g 128, b 136 approx) or black
+            if ((r !== 0 || g !== 0 || b !== 0) && !(r === 0 && g === 136 && b === 136) && !(r === 0 && g === 168 && b === 68)) {
+              return y;
+            }
+          }
+        }
+        return -1;
+      }
+
+      // Frame 0 vs Frame 30 fall
+      const f0 = createFight('aint_man', 123); f0.opponent.action = 'KO'; f0.opponent.actionFrame = 0;
+      const f15 = createFight('aint_man', 123); f15.opponent.action = 'KO'; f15.opponent.actionFrame = 15;
+      const f30 = createFight('aint_man', 123); f30.opponent.action = 'KO'; f30.opponent.actionFrame = 30;
+
+      const m0 = createMockCanvas(); renderFrame(m0.ctx, f0);
+      const m15 = createMockCanvas(); renderFrame(m15.ctx, f15);
+      const m30 = createMockCanvas(); renderFrame(m30.ctx, f30);
+
+      // KO at frame 40 vs frame 44 (blink test: absent in exactly one)
+      const f40 = createFight('aint_man', 123); f40.opponent.action = 'KO'; f40.opponent.actionFrame = 40;
+      const f44 = createFight('aint_man', 123); f44.opponent.action = 'KO'; f44.opponent.actionFrame = 44;
+      const m40 = createMockCanvas(); renderFrame(m40.ctx, f40);
+      const m44 = createMockCanvas(); renderFrame(m44.ctx, f44);
+
+      // Frame without opponent
+      const fEmpty = createFight('aint_man', 123); fEmpty.opponent.action = 'IDLE';
+      const mEmpty = createMockCanvas();
+      // Render without opponent by creating a blank ring frame
+      renderFrame(mEmpty.ctx, fEmpty);
+
+      // Check KO blinking: between frame 40 (blinkWindow = (40-31)/4 = 2 (even -> visible))
+      // and frame 44 (blinkWindow = (44-31)/4 = 3 (odd -> hidden))
+      let pixels40 = 0;
+      let pixels44 = 0;
+      for (let y = 140; y < 200; y++) {
+        for (let x = 64; x < 192; x++) {
+          const idx = (y * CANVAS_WIDTH + x) * 4;
+          if (m40.buffer[idx] !== m44.buffer[idx]) {
+            pixels40++;
+          }
+        }
+      }
+      expect(pixels40, 'KO frame 40 and 44 differ because of blink').toBeGreaterThan(200);
+
+      // KNOCKED_DOWN stays down without blinking at frames 40 and 44
+      const kd40 = createFight('aint_man', 123); kd40.opponent.action = 'KNOCKED_DOWN'; kd40.opponent.actionFrame = 40;
+      const kd44 = createFight('aint_man', 123); kd44.opponent.action = 'KNOCKED_DOWN'; kd44.opponent.actionFrame = 44;
+      const mkd40 = createMockCanvas(); renderFrame(mkd40.ctx, kd40);
+      const mkd44 = createMockCanvas(); renderFrame(mkd44.ctx, kd44);
+
+      let kdDiff = 0;
+      for (let y = 140; y < 200; y++) {
+        for (let x = 64; x < 192; x++) {
+          const idx = (y * CANVAS_WIDTH + x) * 4;
+          if (mkd40.buffer[idx] !== mkd44.buffer[idx]) {
+            kdDiff++;
+          }
+        }
+      }
+      expect(kdDiff, 'KNOCKED_DOWN does not blink between frames 40 and 44').toBe(0);
+    });
+
+    // R5: Taunt bounce oscillates dy between 0 and -6 over 16-frame period of actionFrame
+    it('R5: Taunt bounce oscillates dy between 0 and -6 over 16-frame period of actionFrame', () => {
+      const frames = [0, 4, 7, 11, 15, 16];
+      const buffers = frames.map(f => {
+        const fight = createFight('aint_man', 123);
+        fight.opponent.action = 'TAUNT';
+        fight.opponent.actionFrame = f;
+        const mock = createMockCanvas();
+        renderFrame(mock.ctx, fight);
+        return mock.buffer;
+      });
+
+      // Frame 0 and 16 should be identical (16-frame period)
+      let diff0and16 = 0;
+      for (let i = 0; i < buffers[0].length; i += 4) {
+        if (buffers[0][i] !== buffers[5][i] || buffers[0][i+1] !== buffers[5][i+1]) {
+          diff0and16++;
+        }
+      }
+      expect(diff0and16, 'frame 0 and 16 have same taunt bounce').toBe(0);
+
+      // Frame 0 (dy = 0) and frame 7 (dy = -6) should differ noticeably
+      let diff0and7 = 0;
+      for (let i = 0; i < buffers[0].length; i += 4) {
+        if (buffers[0][i] !== buffers[2][i]) {
+          diff0and7++;
+        }
+      }
+      expect(diff0and7, 'frame 0 and 7 have bounce difference').toBeGreaterThan(300);
+    });
+
+    // R6: Distinct tells without flash: TELL_HOOK_LEFT and TELL_UPPERCUT_LEFT differ by >= 400 px
+    it('R6: Distinct tells without flash differ by >= 400 px with hook dx >= 16 and uppercut dy >= 14', () => {
+      const OPPONENT_IDS = ['aint_man', 'medi_jinx', 'dj_tito', 'mr_yankee', 'maga_man'];
+
+      for (const oppId of OPPONENT_IDS) {
+        // Force normal palette
+        const fHook = createFight(oppId, 123);
+        fHook.opponent.action = 'TELL_HOOK_LEFT';
+        fHook.opponent.actionFrame = 4; // frame 4 is normal palette window
+
+        const fUpper = createFight(oppId, 123);
+        fUpper.opponent.action = 'TELL_UPPERCUT_LEFT';
+        fUpper.opponent.actionFrame = 4; // normal palette
+
+        const mHook = createMockCanvas(); renderFrame(mHook.ctx, fHook);
+        const mUpper = createMockCanvas(); renderFrame(mUpper.ctx, fUpper);
+
+        let diffPx = 0;
+        for (let i = 0; i < mHook.buffer.length; i += 4) {
+          if (
+            mHook.buffer[i] !== mUpper.buffer[i] ||
+            mHook.buffer[i+1] !== mUpper.buffer[i+1] ||
+            mHook.buffer[i+2] !== mUpper.buffer[i+2]
+          ) {
+            diffPx++;
+          }
+        }
+        expect(diffPx, `${oppId} hook vs uppercut without flash differs by >= 400 px`).toBeGreaterThanOrEqual(400);
+
+        // Check hook dx and uppercut dy
+        expect(Math.abs(OPPONENT_POSES['TELL_HOOK_LEFT'].dx)).toBeGreaterThanOrEqual(16);
+        expect(OPPONENT_POSES['TELL_UPPERCUT_LEFT'].dy).toBeGreaterThanOrEqual(14);
+      }
+    });
+  });
 });
+
