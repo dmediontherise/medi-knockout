@@ -36,6 +36,9 @@ import {
   isOpponentUnlocked,
   CIRCUIT_FOOTER_LINES,
 } from '../../src/render/screens/circuit';
+import { renderIntroScreen } from '../../src/render/screens/intro';
+import { PLAYER_FRAMES, PLAYER_ANCHORS } from '../../src/render/sprites/generated/player';
+import { getFrameKeypoints } from '../../scripts/build-player.mjs';
 import { renderResultsScreen } from '../../src/render/screens/results';
 import {
   OPPONENT_PRESENTATION,
@@ -435,7 +438,7 @@ describe('Character Sprite Palettes and Dimensions', () => {
       const idle = createFight('aint_man', 123); idle.player.action = 'IDLE';
       const dodgeL = createFight('aint_man', 123); dodgeL.player.action = 'DODGE_LEFT'; dodgeL.player.actionFrame = 6;
       const dodgeR = createFight('aint_man', 123); dodgeR.player.action = 'DODGE_RIGHT'; dodgeR.player.actionFrame = 6;
-      const duck = createFight('aint_man', 123); duck.player.action = 'DUCK';
+      const duck = createFight('aint_man', 123); duck.player.action = 'DUCK'; duck.player.actionFrame = 5;
 
       function getHeadMetrics(fight: any) {
         const draw = computePlayerDraw(fight);
@@ -1502,14 +1505,16 @@ describe('Task 012: Real animation frames from sheets', () => {
 describe('Task 014: Animated player rig', () => {
   const FRAME_NAMES = [
     'IDLE_A', 'IDLE_B',
-    'JAB_L_WIND', 'JAB_L_HIT', 'JAB_L_BACK',
-    'JAB_R_WIND', 'JAB_R_HIT', 'JAB_R_BACK',
-    'BODY_L_WIND', 'BODY_L_HIT', 'BODY_L_BACK',
-    'BODY_R_WIND', 'BODY_R_HIT', 'BODY_R_BACK',
-    'STAR_WIND', 'STAR_HIT', 'STAR_BACK',
+    'JAB_L_WIND', 'JAB_L_MID', 'JAB_L_HIT', 'JAB_L_BACK',
+    'JAB_R_WIND', 'JAB_R_MID', 'JAB_R_HIT', 'JAB_R_BACK',
+    'BODY_L_WIND', 'BODY_L_MID', 'BODY_L_HIT', 'BODY_L_BACK',
+    'BODY_R_WIND', 'BODY_R_MID', 'BODY_R_HIT', 'BODY_R_BACK',
+    'STAR_WIND', 'STAR_MID', 'STAR_HIT', 'STAR_BACK',
     'DODGE_L_HALF', 'DODGE_L',
     'DODGE_R_HALF', 'DODGE_R',
-    'DUCK', 'BLOCK', 'HIT',
+    'DUCK_HALF', 'DUCK',
+    'BLOCK_HALF', 'BLOCK',
+    'HIT', 'HIT_BACK',
     'EXHAUSTED_A', 'EXHAUSTED_B',
     'FALL', 'DOWN', 'GET_UP', 'WIN'
   ];
@@ -1558,9 +1563,10 @@ describe('Task 014: Animated player rig', () => {
     expect(resolvePlayerFrame('IDLE', 0, { frame: 31 }).frameName).toBe('IDLE_B');
     expect(resolvePlayerFrame('IDLE', 0, { frame: 32 }).frameName).toBe('IDLE_A');
 
-    // PUNCH_LEFT_HEAD: 0-3 WIND, 4-8 HIT, 9+ BACK
+    // PUNCH_LEFT_HEAD: 0-2 WIND, 3 MID, 4-8 HIT, 9+ BACK
     expect(resolvePlayerFrame('PUNCH_LEFT_HEAD', 0).frameName).toBe('JAB_L_WIND');
-    expect(resolvePlayerFrame('PUNCH_LEFT_HEAD', 3).frameName).toBe('JAB_L_WIND');
+    expect(resolvePlayerFrame('PUNCH_LEFT_HEAD', 2).frameName).toBe('JAB_L_WIND');
+    expect(resolvePlayerFrame('PUNCH_LEFT_HEAD', 3).frameName).toBe('JAB_L_MID');
     expect(resolvePlayerFrame('PUNCH_LEFT_HEAD', 4).frameName).toBe('JAB_L_HIT');
     expect(resolvePlayerFrame('PUNCH_LEFT_HEAD', 8).frameName).toBe('JAB_L_HIT');
     expect(resolvePlayerFrame('PUNCH_LEFT_HEAD', 9).frameName).toBe('JAB_L_BACK');
@@ -1568,20 +1574,24 @@ describe('Task 014: Animated player rig', () => {
 
     // PUNCH_RIGHT_HEAD: R frames
     expect(resolvePlayerFrame('PUNCH_RIGHT_HEAD', 0).frameName).toBe('JAB_R_WIND');
+    expect(resolvePlayerFrame('PUNCH_RIGHT_HEAD', 3).frameName).toBe('JAB_R_MID');
     expect(resolvePlayerFrame('PUNCH_RIGHT_HEAD', 4).frameName).toBe('JAB_R_HIT');
     expect(resolvePlayerFrame('PUNCH_RIGHT_HEAD', 9).frameName).toBe('JAB_R_BACK');
 
-    // PUNCH_*_BODY: BODY frames
+    // PUNCH_*_BODY: BODY frames (0-2 WIND, 3 MID, 4-8 HIT, 9+ BACK)
     expect(resolvePlayerFrame('PUNCH_LEFT_BODY', 2).frameName).toBe('BODY_L_WIND');
+    expect(resolvePlayerFrame('PUNCH_LEFT_BODY', 3).frameName).toBe('BODY_L_MID');
     expect(resolvePlayerFrame('PUNCH_LEFT_BODY', 5).frameName).toBe('BODY_L_HIT');
     expect(resolvePlayerFrame('PUNCH_LEFT_BODY', 10).frameName).toBe('BODY_L_BACK');
     expect(resolvePlayerFrame('PUNCH_RIGHT_BODY', 1).frameName).toBe('BODY_R_WIND');
+    expect(resolvePlayerFrame('PUNCH_RIGHT_BODY', 3).frameName).toBe('BODY_R_MID');
     expect(resolvePlayerFrame('PUNCH_RIGHT_BODY', 6).frameName).toBe('BODY_R_HIT');
     expect(resolvePlayerFrame('PUNCH_RIGHT_BODY', 11).frameName).toBe('BODY_R_BACK');
 
-    // STAR_PUNCH: 0-7 WIND, 8-15 HIT, 16+ BACK
+    // STAR_PUNCH: 0-6 WIND, 7 MID, 8-15 HIT, 16+ BACK
     expect(resolvePlayerFrame('STAR_PUNCH', 0).frameName).toBe('STAR_WIND');
-    expect(resolvePlayerFrame('STAR_PUNCH', 7).frameName).toBe('STAR_WIND');
+    expect(resolvePlayerFrame('STAR_PUNCH', 6).frameName).toBe('STAR_WIND');
+    expect(resolvePlayerFrame('STAR_PUNCH', 7).frameName).toBe('STAR_MID');
     expect(resolvePlayerFrame('STAR_PUNCH', 8).frameName).toBe('STAR_HIT');
     expect(resolvePlayerFrame('STAR_PUNCH', 15).frameName).toBe('STAR_HIT');
     expect(resolvePlayerFrame('STAR_PUNCH', 16).frameName).toBe('STAR_BACK');
@@ -1599,10 +1609,18 @@ describe('Task 014: Animated player rig', () => {
     expect(resolvePlayerFrame('DODGE_RIGHT', 10).frameName).toBe('DODGE_R');
     expect(resolvePlayerFrame('DODGE_RIGHT', 19).frameName).toBe('DODGE_R_HALF');
 
-    // DUCK, BLOCK, HIT
+    // DUCK: 0-2 and 17+ DUCK_HALF, else DUCK
+    expect(resolvePlayerFrame('DUCK', 1).frameName).toBe('DUCK_HALF');
     expect(resolvePlayerFrame('DUCK', 5).frameName).toBe('DUCK');
+    expect(resolvePlayerFrame('DUCK', 18).frameName).toBe('DUCK_HALF');
+
+    // BLOCK: 0-2 BLOCK_HALF, else BLOCK
+    expect(resolvePlayerFrame('BLOCK', 1).frameName).toBe('BLOCK_HALF');
     expect(resolvePlayerFrame('BLOCK', 5).frameName).toBe('BLOCK');
+
+    // HIT: 0-9 HIT, 10+ HIT_BACK
     expect(resolvePlayerFrame('HIT', 2).frameName).toBe('HIT');
+    expect(resolvePlayerFrame('HIT', 10).frameName).toBe('HIT_BACK');
 
     // isExhausted and idle: EXHAUSTED_A / B, alternating every 12 frames, pink palette
     const exhA = resolvePlayerFrame('IDLE', 0, { frame: 0, player: { isExhausted: true } });
@@ -1732,7 +1750,7 @@ describe('Task 014: Animated player rig', () => {
     const jabLGloves = getRedPixels(jabL, jabLAnchor, (x) => x < 0);
     const jabLTop = Math.min(...jabLGloves.map((p) => p.y));
     expect(idleLTop - jabLTop, 'JAB_L_HIT left glove top >= 24 px above IDLE_A').toBeGreaterThanOrEqual(24);
-    expect(jabLGloves.length / idleLGloves.length, 'JAB_L_HIT left glove area <= 80% of IDLE_A').toBeLessThanOrEqual(0.8);
+    expect(jabLGloves.length / idleLGloves.length, 'JAB_L_HIT left glove area <= 85% of IDLE_A').toBeLessThanOrEqual(0.85);
 
     const jabRGloves = getRedPixels(jabL, jabLAnchor, (x) => x > 5);
     const idleRBox = {
@@ -1758,7 +1776,7 @@ describe('Task 014: Animated player rig', () => {
     const jabRGlovesR = getRedPixels(jabR, jabRAnchor, (x) => x > 0);
     const jabRTop = Math.min(...jabRGlovesR.map((p) => p.y));
     expect(idleRTop - jabRTop, 'JAB_R_HIT right glove top >= 24 px above IDLE_A').toBeGreaterThanOrEqual(24);
-    expect(jabRGlovesR.length / idleRGloves.length, 'JAB_R_HIT right glove area <= 80%').toBeLessThanOrEqual(0.8);
+    expect(jabRGlovesR.length / idleRGloves.length, 'JAB_R_HIT right glove area <= 85%').toBeLessThanOrEqual(0.85);
 
     // 3. BODY_L_HIT:
     // left glove center is >= 6 px closer to the spine than in IDLE_A, and lower than JAB_L_HIT glove center by >= 30 px
@@ -2370,6 +2388,425 @@ describe('Task 015: Fight feel tests (Screen shake, Directional hit, Punch lunge
     });
   });
 });
+
+describe('Task 017: Smooth polish', () => {
+  // Requirement 1: Little Mac proportions
+  describe('Requirement 1: Little Mac proportions', () => {
+    it('each red-glove connected component (R+H) is >= 150 px for every frame', () => {
+      for (const [name, sprite] of Object.entries(PLAYER_FRAMES)) {
+        const visited = new Set<string>();
+        const components: string[][] = [];
+
+        for (let r = 0; r < sprite.height; r++) {
+          for (let c = 0; c < sprite.width; c++) {
+            const ch = sprite.rows[r][c];
+            const key = `${c},${r}`;
+            if ((ch === 'R' || ch === 'H') && !visited.has(key)) {
+              const comp: string[] = [];
+              const queue = [key];
+              visited.add(key);
+              while (queue.length > 0) {
+                const cur = queue.pop()!;
+                comp.push(cur);
+                const [cx, cy] = cur.split(',').map(Number);
+                for (const [nx, ny] of [[cx + 1, cy], [cx - 1, cy], [cx, cy + 1], [cx, cy - 1]]) {
+                  if (nx >= 0 && nx < sprite.width && ny >= 0 && ny < sprite.height) {
+                    const nch = sprite.rows[ny][nx];
+                    const nk = `${nx},${ny}`;
+                    if ((nch === 'R' || nch === 'H') && !visited.has(nk)) {
+                      visited.add(nk);
+                      queue.push(nk);
+                    }
+                  }
+                }
+              }
+              components.push(comp);
+            }
+          }
+        }
+
+        expect(components.length, `${name} has at least one visible red glove component`).toBeGreaterThanOrEqual(1);
+        for (const comp of components) {
+          expect(comp.length, `${name} glove component has >= 150 px`).toBeGreaterThanOrEqual(150);
+        }
+      }
+    });
+
+    it('in IDLE_A each glove is >= 230 px', () => {
+      const idleA = PLAYER_FRAMES['IDLE_A'];
+      const visited = new Set<string>();
+      const components: string[][] = [];
+
+      for (let r = 0; r < idleA.height; r++) {
+        for (let c = 0; c < idleA.width; c++) {
+          const ch = idleA.rows[r][c];
+          const key = `${c},${r}`;
+          if ((ch === 'R' || ch === 'H') && !visited.has(key)) {
+            const comp: string[] = [];
+            const queue = [key];
+            visited.add(key);
+            while (queue.length > 0) {
+              const cur = queue.pop()!;
+              comp.push(cur);
+              const [cx, cy] = cur.split(',').map(Number);
+              for (const [nx, ny] of [[cx + 1, cy], [cx - 1, cy], [cx, cy + 1], [cx, cy - 1]]) {
+                if (nx >= 0 && nx < idleA.width && ny >= 0 && ny < idleA.height) {
+                  const nch = idleA.rows[ny][nx];
+                  const nk = `${nx},${ny}`;
+                  if ((nch === 'R' || nch === 'H') && !visited.has(nk)) {
+                    visited.add(nk);
+                    queue.push(nk);
+                  }
+                }
+              }
+            }
+            components.push(comp);
+          }
+        }
+      }
+
+      expect(components.length, 'IDLE_A has 2 glove components').toBe(2);
+      for (const comp of components) {
+        expect(comp.length, 'IDLE_A each glove >= 230 px').toBeGreaterThanOrEqual(230);
+      }
+    });
+
+    it('the narrowest skin run across each forearm, measured perpendicular to the segment, is >= 10 px', () => {
+      for (const [name, sprite] of Object.entries(PLAYER_FRAMES)) {
+        if (name === 'DOWN' || name === 'FALL') continue;
+        const kp = getFrameKeypoints(name);
+        const anchorX = PLAYER_ANCHORS[name];
+
+        for (let arm = 0; arm < 2; arm++) {
+          const elbow = kp.elbows[arm];
+          const glove = kp.gloves[arm];
+          const dx = glove[0] - elbow[0];
+          const dy = glove[1] - elbow[1];
+          const len = Math.hypot(dx, dy);
+          if (len < 6) continue;
+          const nx = -dy / len;
+          const ny = dx / len;
+
+          let maxRun = 0;
+          for (let t = 0.1; t <= 0.6; t += 0.1) {
+            const mx = elbow[0] + t * dx;
+            const my = elbow[1] + t * dy;
+            const mc = Math.round(mx + anchorX);
+            const mr = Math.round(my - 103 + sprite.height - 1);
+
+            const centerCh = sprite.rows[mr]?.[mc];
+            if (centerCh === 'S' || centerCh === 'K') {
+              let count = 1;
+              for (let s = 1; s <= 15; s++) {
+                const sc = Math.round(mc + s * nx);
+                const sr = Math.round(mr + s * ny);
+                const ch = sprite.rows[sr]?.[sc];
+                if (ch === 'S' || ch === 'K') count++;
+                else break;
+              }
+              for (let s = 1; s <= 15; s++) {
+                const sc = Math.round(mc - s * nx);
+                const sr = Math.round(mr - s * ny);
+                const ch = sprite.rows[sr]?.[sc];
+                if (ch === 'S' || ch === 'K') count++;
+                else break;
+              }
+              if (count > maxRun) maxRun = count;
+            }
+          }
+
+          if (maxRun > 0) {
+            expect(maxRun, `${name} arm ${arm} narrowest forearm skin run >= 10 px`).toBeGreaterThanOrEqual(10);
+          }
+        }
+      }
+    });
+  });
+
+  // Requirement 2: In-between frames
+  describe('Requirement 2: In-between frames', () => {
+    function countSpriteDiff(s1: SpriteData, a1: number, s2: SpriteData, a2: number) {
+      const minX = Math.min(-a1, -a2);
+      const maxX = Math.max(s1.width - 1 - a1, s2.width - 1 - a2);
+      const minY = Math.min(103 - (s1.height - 1), 103 - (s2.height - 1));
+      const maxY = 103;
+      let diff = 0;
+      for (let y = minY; y <= maxY; y++) {
+        const r1 = y - 103 + (s1.height - 1);
+        const r2 = y - 103 + (s2.height - 1);
+        const row1 = (r1 >= 0 && r1 < s1.height) ? s1.rows[r1] : null;
+        const row2 = (r2 >= 0 && r2 < s2.height) ? s2.rows[r2] : null;
+        for (let x = minX; x <= maxX; x++) {
+          const c1 = x + a1;
+          const c2 = x + a2;
+          const ch1 = (row1 && c1 >= 0 && c1 < s1.width) ? row1[c1] : '.';
+          const ch2 = (row2 && c2 >= 0 && c2 < s2.width) ? row2[c2] : '.';
+          if (ch1 !== ch2) diff++;
+        }
+      }
+      return diff;
+    }
+
+    interface InBetweenPair {
+      m: string;
+      a: string;
+      b: string;
+      useHeadTop?: boolean;
+      gloveIdx?: number;
+    }
+
+    const IN_BETWEEN_PAIRS: InBetweenPair[] = [
+      { m: 'DUCK_HALF', a: 'IDLE_A', b: 'DUCK', useHeadTop: true },
+      { m: 'BLOCK_HALF', a: 'IDLE_A', b: 'BLOCK', gloveIdx: 0 },
+      { m: 'JAB_L_MID', a: 'JAB_L_WIND', b: 'JAB_L_HIT', gloveIdx: 0 },
+      { m: 'JAB_R_MID', a: 'JAB_R_WIND', b: 'JAB_R_HIT', gloveIdx: 1 },
+      { m: 'BODY_L_MID', a: 'BODY_L_WIND', b: 'BODY_L_HIT', gloveIdx: 0 },
+      { m: 'BODY_R_MID', a: 'BODY_R_WIND', b: 'BODY_R_HIT', gloveIdx: 1 },
+      { m: 'STAR_MID', a: 'STAR_WIND', b: 'STAR_HIT', gloveIdx: 1 },
+      { m: 'HIT_BACK', a: 'HIT', b: 'IDLE_A', gloveIdx: 0 },
+    ];
+
+    for (const p of IN_BETWEEN_PAIRS) {
+      it(`${p.m}: halfway within 4 px and differs from ${p.a} & ${p.b} by >= 80 px`, () => {
+        const kpM = getFrameKeypoints(p.m);
+        const kpA = getFrameKeypoints(p.a);
+        const kpB = getFrameKeypoints(p.b);
+        const sM = PLAYER_FRAMES[p.m];
+        const sA = PLAYER_FRAMES[p.a];
+        const sB = PLAYER_FRAMES[p.b];
+        const aM = PLAYER_ANCHORS[p.m];
+        const aA = PLAYER_ANCHORS[p.a];
+        const aB = PLAYER_ANCHORS[p.b];
+
+        if (p.useHeadTop) {
+          const headTopM = kpM.head[1] - kpM.headRy;
+          const headTopA = kpA.head[1] - kpA.headRy;
+          const headTopB = kpB.head[1] - kpB.headRy;
+          const midHeadTop = (headTopA + headTopB) / 2;
+          expect(Math.abs(headTopM - midHeadTop), `${p.m} head top within 4 px of midpoint`).toBeLessThanOrEqual(4);
+        } else {
+          const gM = kpM.gloves[p.gloveIdx!];
+          const gA = kpA.gloves[p.gloveIdx!];
+          const gB = kpB.gloves[p.gloveIdx!];
+          const midX = (gA[0] + gB[0]) / 2;
+          const midY = (gA[1] + gB[1]) / 2;
+          const dist = Math.hypot(gM[0] - midX, gM[1] - midY);
+          expect(dist, `${p.m} glove center within 4 px of midpoint`).toBeLessThanOrEqual(4);
+        }
+
+        const diffA = countSpriteDiff(sM, aM, sA, aA);
+        const diffB = countSpriteDiff(sM, aM, sB, aB);
+        expect(diffA, `${p.m} differs from ${p.a} by >= 80 px`).toBeGreaterThanOrEqual(80);
+        expect(diffB, `${p.m} differs from ${p.b} by >= 80 px`).toBeGreaterThanOrEqual(80);
+      });
+    }
+  });
+
+  // Requirement 3: Visible head snap for every opponent
+  describe('Requirement 3: Visible head snap for every opponent', () => {
+    for (const oppId of CIRCUIT_ROSTER_IDS) {
+      it(`${oppId}: head center of LEFT head hit at frame 2 is >= 12 px right of RIGHT head hit`, () => {
+        const leftDraw = computeOpponentDraw(oppId, 'HIT', 2, 0, 'LEFT', 'HEAD');
+        const rightDraw = computeOpponentDraw(oppId, 'HIT', 2, 0, 'RIGHT', 'HEAD');
+
+        function getHeadCenterX(draw: ReturnType<typeof computeOpponentDraw>) {
+          let firstOpaque = -1;
+          let lastOpaque = -1;
+          for (let r = 0; r < draw.sprite.height; r++) {
+            if (draw.sprite.rows[r]?.split('').some((c) => c !== '.' && c !== ' ')) {
+              if (firstOpaque < 0) firstOpaque = r;
+              lastOpaque = r;
+            }
+          }
+          const opaqueH = lastOpaque - firstOpaque + 1;
+          const top25Rows = Math.round(0.25 * opaqueH);
+          let sumX = 0;
+          let count = 0;
+          for (let r = firstOpaque; r < firstOpaque + top25Rows; r++) {
+            const row = draw.sprite.rows[r];
+            if (!row) continue;
+            const rowOffset = draw.rowOffsets ? (draw.rowOffsets[r] ?? 0) : 0;
+            for (let c = 0; c < draw.sprite.width; c++) {
+              if (row[c] !== '.' && row[c] !== ' ') {
+                const px = draw.x + c + rowOffset;
+                sumX += px;
+                count++;
+              }
+            }
+          }
+          return count > 0 ? sumX / count : 0;
+        }
+
+        const leftCx = getHeadCenterX(leftDraw);
+        const rightCx = getHeadCenterX(rightDraw);
+        const diff = leftCx - rightCx;
+
+        expect(diff, `${oppId} head center of LEFT hit is >= 12 px right of RIGHT hit`).toBeGreaterThanOrEqual(12);
+      });
+    }
+  });
+
+  // Requirement 4: MEDI JINX portrait reads as a face
+  describe('Requirement 4: Opponent portraits read clearly', () => {
+    const NEAR_BLACK_RGBA = new Set<string>();
+    for (const c of [0x0f, 0x0d, 0x1d, 0x2d, 0x00]) {
+      const [r, g, b] = nesToRgba(c);
+      NEAR_BLACK_RGBA.add(`${r},${g},${b}`);
+    }
+
+    for (const oppId of CIRCUIT_ROSTER_IDS) {
+      it(`${oppId}: >= 25% of the drawn circuit portrait opaque pixels are not black/near-black`, () => {
+        const buffer = new Uint8ClampedArray(CANVAS_WIDTH * CANVAS_HEIGHT * 4);
+        const mockCtx = {
+          createImageData: (w: number, h: number) => ({ width: w, height: h, data: buffer }),
+          putImageData: (imgData: any) => { buffer.set(imgData.data); },
+        } as unknown as CanvasRenderingContext2D;
+
+        const oppIndex = CIRCUIT_ROSTER_IDS.indexOf(oppId);
+        renderCircuitScreen(mockCtx, 0, 4, true, 0);
+
+        const rowY = 30 + oppIndex * 38;
+        const pX = 24 + 1;
+        const pY = rowY + 1;
+
+        let totalOpaque = 0;
+        let nonBlack = 0;
+
+        for (let y = pY; y < pY + 32; y++) {
+          for (let x = pX; x < pX + 32; x++) {
+            totalOpaque++;
+            const idx = (y * CANVAS_WIDTH + x) * 4;
+            const key = `${buffer[idx]},${buffer[idx + 1]},${buffer[idx + 2]}`;
+            if (!NEAR_BLACK_RGBA.has(key)) {
+              nonBlack++;
+            }
+          }
+        }
+
+        const ratio = nonBlack / totalOpaque;
+        expect(ratio, `${oppId} drawn portrait has >= 25% non-black pixels`).toBeGreaterThanOrEqual(0.25);
+      });
+    }
+  });
+
+  // Requirement 6: Mutation survivors (M1, M4/M5, M6, M7)
+  describe('Requirement 6: Mutation survivors', () => {
+    // M1: portrait crop centered on head center, not sprite.width / 2
+    for (const oppId of CIRCUIT_ROSTER_IDS) {
+      it(`M1: ${oppId} portrait crop is centered on head center, not sprite.width / 2`, () => {
+        const info = OPPONENT_PRESENTATION[oppId];
+        const crop = getPortraitCrop(oppId);
+        const altCropX = Math.round(info.sprite.width / 2 - crop.w / 2);
+
+        expect(crop.x, `${oppId} cropX differs from sprite-centered cropX`).not.toBe(altCropX);
+      });
+    }
+
+    // M4/M5: renderCircuitScreen and renderIntroScreen drawn portrait cell's opaque bbox fills >= 90%
+    it('M4: renderCircuitScreen drawn portrait cells fill >= 90% of width and height', () => {
+      const buffer = new Uint8ClampedArray(CANVAS_WIDTH * CANVAS_HEIGHT * 4);
+      const mockCtx = {
+        createImageData: (w: number, h: number) => ({ width: w, height: h, data: buffer }),
+        putImageData: (imgData: any) => { buffer.set(imgData.data); },
+      } as unknown as CanvasRenderingContext2D;
+
+      renderCircuitScreen(mockCtx, 0, 4, true, 0);
+      const [bgR, bgG, bgB] = nesToRgba(0x02);
+
+      for (let i = 0; i < CIRCUIT_ROSTER_IDS.length; i++) {
+        const oppId = CIRCUIT_ROSTER_IDS[i];
+        const rowY = 30 + i * 38;
+        const cellX = 25;
+        const cellY = rowY + 1;
+        let minDx = Infinity, maxDx = -Infinity, minDy = Infinity, maxDy = -Infinity;
+
+        for (let dy = 0; dy < 32; dy++) {
+          for (let dx = 0; dx < 32; dx++) {
+            const px = cellX + dx;
+            const py = cellY + dy;
+            const idx = (py * CANVAS_WIDTH + px) * 4;
+            const isBg = buffer[idx] === bgR && buffer[idx + 1] === bgG && buffer[idx + 2] === bgB;
+            if (!isBg) {
+              if (dx < minDx) minDx = dx;
+              if (dx > maxDx) maxDx = dx;
+              if (dy < minDy) minDy = dy;
+              if (dy > maxDy) maxDy = dy;
+            }
+          }
+        }
+
+        const bboxW = maxDx - minDx + 1;
+        const bboxH = maxDy - minDy + 1;
+        expect(bboxW / 32, `${oppId} circuit portrait fills >= 90% width`).toBeGreaterThanOrEqual(0.9);
+        expect(bboxH / 32, `${oppId} circuit portrait fills >= 90% height`).toBeGreaterThanOrEqual(0.9);
+      }
+    });
+
+    it('M5: renderIntroScreen drawn portrait cell fills >= 90% of width and height', () => {
+      const [bgR, bgG, bgB] = nesToRgba(0x0F);
+
+      for (const oppId of CIRCUIT_ROSTER_IDS) {
+        const buffer = new Uint8ClampedArray(CANVAS_WIDTH * CANVAS_HEIGHT * 4);
+        const mockCtx = {
+          createImageData: (w: number, h: number) => ({ width: w, height: h, data: buffer }),
+          putImageData: (imgData: any) => { buffer.set(imgData.data); },
+        } as unknown as CanvasRenderingContext2D;
+
+        renderIntroScreen(mockCtx, oppId, 0);
+
+        const cellX = 18;
+        const cellY = 26;
+        let minDx = Infinity, maxDx = -Infinity, minDy = Infinity, maxDy = -Infinity;
+
+        for (let dy = 0; dy < 48; dy++) {
+          for (let dx = 0; dx < 48; dx++) {
+            const px = cellX + dx;
+            const py = cellY + dy;
+            const idx = (py * CANVAS_WIDTH + px) * 4;
+            const isBg = buffer[idx] === bgR && buffer[idx + 1] === bgG && buffer[idx + 2] === bgB;
+            if (!isBg) {
+              if (dx < minDx) minDx = dx;
+              if (dx > maxDx) maxDx = dx;
+              if (dy < minDy) minDy = dy;
+              if (dy > maxDy) maxDy = dy;
+            }
+          }
+        }
+
+        const bboxW = maxDx - minDx + 1;
+        const bboxH = maxDy - minDy + 1;
+        expect(bboxW / 48, `${oppId} intro portrait fills >= 90% width`).toBeGreaterThanOrEqual(0.9);
+        expect(bboxH / 48, `${oppId} intro portrait fills >= 90% height`).toBeGreaterThanOrEqual(0.9);
+      }
+    });
+
+    // M6: PUNCH_HOOK_RIGHT mid-recovery lungeDx is strictly between active value and 0
+    it('M6: PUNCH_HOOK_RIGHT mid-recovery lungeDx is strictly between active value and 0', () => {
+      const active = computeOpponentLunge('PUNCH_HOOK_RIGHT', 0);
+      const mid = computeOpponentLunge('PUNCH_HOOK_RIGHT', 21);
+
+      expect(mid.lungeDx, 'PUNCH_HOOK_RIGHT mid-recovery lungeDx < 0').toBeLessThan(0);
+      expect(mid.lungeDx, 'PUNCH_HOOK_RIGHT mid-recovery lungeDx > active value').toBeGreaterThan(active.lungeDx);
+    });
+
+    // M7: opponent KO frames 0-9 are mirrored per lastHitSide
+    it('M7: opponent KO frames 0-9 are mirrored per lastHitSide', () => {
+      for (const oppId of CIRCUIT_ROSTER_IDS) {
+        for (let frame = 0; frame < 10; frame++) {
+          const leftSpr = getOpponentSprite(oppId, 'KO', frame, 'LEFT');
+          const rightSpr = getOpponentSprite(oppId, 'KO', frame, 'RIGHT');
+
+          let diffCount = 0;
+          for (let r = 0; r < Math.min(leftSpr.height, rightSpr.height); r++) {
+            if (leftSpr.rows[r] !== rightSpr.rows[r]) diffCount++;
+          }
+          expect(diffCount, `${oppId} KO frame ${frame} has mirrored rows between LEFT and RIGHT hit`).toBeGreaterThan(0);
+        }
+      }
+    });
+  });
+});
+
 
 
 

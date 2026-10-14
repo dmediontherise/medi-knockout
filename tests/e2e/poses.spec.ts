@@ -5,6 +5,9 @@ import { PNG } from 'pngjs';
 import { Jimp } from 'jimp';
 import { NES_PALETTE } from '../../src/render/nesPalette';
 import { FONT_8X8 } from '../../src/render/sprites/font';
+import { createFight } from '../../src/core/engine';
+import { renderFrame, CANVAS_WIDTH, CANVAS_HEIGHT } from '../../src/render/renderFrame';
+import { PLAYER_DURATIONS } from '../../src/core/constants';
 
 // Task 016 Requirement 3: wait on observable state instead of a fixed timeout.
 // A pose preview sets data-game-state="PLAYING" and renders the requested frame in an
@@ -174,27 +177,35 @@ test.describe('Pose Preview and Contact Sheets Suite', () => {
     { name: 'IDLE_A', query: 'player=IDLE&frame=0' },
     { name: 'IDLE_B', query: 'player=IDLE&frame=16' },
     { name: 'JAB_L_WIND', query: 'player=PUNCH_LEFT_HEAD&pframe=0' },
+    { name: 'JAB_L_MID', query: 'player=PUNCH_LEFT_HEAD&pframe=3' },
     { name: 'JAB_L_HIT', query: 'player=PUNCH_LEFT_HEAD&pframe=5' },
     { name: 'JAB_L_BACK', query: 'player=PUNCH_LEFT_HEAD&pframe=10' },
     { name: 'JAB_R_WIND', query: 'player=PUNCH_RIGHT_HEAD&pframe=0' },
+    { name: 'JAB_R_MID', query: 'player=PUNCH_RIGHT_HEAD&pframe=3' },
     { name: 'JAB_R_HIT', query: 'player=PUNCH_RIGHT_HEAD&pframe=5' },
     { name: 'JAB_R_BACK', query: 'player=PUNCH_RIGHT_HEAD&pframe=10' },
     { name: 'BODY_L_WIND', query: 'player=PUNCH_LEFT_BODY&pframe=0' },
+    { name: 'BODY_L_MID', query: 'player=PUNCH_LEFT_BODY&pframe=3' },
     { name: 'BODY_L_HIT', query: 'player=PUNCH_LEFT_BODY&pframe=5' },
     { name: 'BODY_L_BACK', query: 'player=PUNCH_LEFT_BODY&pframe=10' },
     { name: 'BODY_R_WIND', query: 'player=PUNCH_RIGHT_BODY&pframe=0' },
+    { name: 'BODY_R_MID', query: 'player=PUNCH_RIGHT_BODY&pframe=3' },
     { name: 'BODY_R_HIT', query: 'player=PUNCH_RIGHT_BODY&pframe=5' },
     { name: 'BODY_R_BACK', query: 'player=PUNCH_RIGHT_BODY&pframe=10' },
     { name: 'STAR_WIND', query: 'player=STAR_PUNCH&pframe=2' },
+    { name: 'STAR_MID', query: 'player=STAR_PUNCH&pframe=7' },
     { name: 'STAR_HIT', query: 'player=STAR_PUNCH&pframe=10' },
     { name: 'STAR_BACK', query: 'player=STAR_PUNCH&pframe=18' },
     { name: 'DODGE_L_HALF', query: 'player=DODGE_LEFT&pframe=1' },
     { name: 'DODGE_L', query: 'player=DODGE_LEFT&pframe=6' },
     { name: 'DODGE_R_HALF', query: 'player=DODGE_RIGHT&pframe=1' },
     { name: 'DODGE_R', query: 'player=DODGE_RIGHT&pframe=6' },
-    { name: 'DUCK', query: 'player=DUCK&pframe=0' },
-    { name: 'BLOCK', query: 'player=BLOCK&pframe=0' },
+    { name: 'DUCK_HALF', query: 'player=DUCK&pframe=1' },
+    { name: 'DUCK', query: 'player=DUCK&pframe=5' },
+    { name: 'BLOCK_HALF', query: 'player=BLOCK&pframe=1' },
+    { name: 'BLOCK', query: 'player=BLOCK&pframe=5' },
     { name: 'HIT', query: 'player=HIT&pframe=6' },
+    { name: 'HIT_BACK', query: 'player=HIT&pframe=12' },
     { name: 'EXHAUSTED_A', query: 'player=IDLE&exh=1&frame=0' },
     { name: 'EXHAUSTED_B', query: 'player=IDLE&exh=1&frame=12' },
     { name: 'FALL', query: 'player=KNOCKED_DOWN&pframe=5' },
@@ -225,7 +236,7 @@ test.describe('Pose Preview and Contact Sheets Suite', () => {
   }
 
   test('player contact sheet: screenshots/player/contact.png', async () => {
-    // 5 columns by 6 rows grid for the 30 frames
+    // 5 columns by 8 rows grid for the 38 frames
     const cols = 5;
     const rows = Math.ceil(PLAYER_FRAME_TESTS.length / cols);
     const cellW = 256;
@@ -266,6 +277,50 @@ test.describe('Pose Preview and Contact Sheets Suite', () => {
     expect(fs.existsSync(contactPath)).toBe(true);
     verifyPngNesPalette(contactPath);
   });
+
+  // Task 017 Requirement 5: sequence-<action>.png horizontal strips
+  const SEQUENCE_ACTIONS: { action: string; frames: number }[] = [
+    { action: 'PUNCH_LEFT_HEAD', frames: 14 },
+    { action: 'PUNCH_RIGHT_BODY', frames: 14 },
+    { action: 'STAR_PUNCH', frames: 22 },
+    { action: 'DODGE_LEFT', frames: 22 },
+    { action: 'DUCK', frames: 20 },
+    { action: 'BLOCK', frames: 10 },
+    { action: 'HIT', frames: 16 },
+  ];
+
+  for (const { action, frames } of SEQUENCE_ACTIONS) {
+    test(`player sequence strip: screenshots/player/sequence-${action}.png`, async () => {
+      const cellW = CANVAS_WIDTH;
+      const cellH = CANVAS_HEIGHT;
+      const totalW = frames * cellW;
+      const totalH = cellH;
+
+      const strip = new Jimp({ width: totalW, height: totalH, color: 0x000000ff });
+
+      for (let f = 0; f < frames; f++) {
+        const buffer = new Uint8ClampedArray(cellW * cellH * 4);
+        const mockCtx = {
+          createImageData: (w: number, h: number) => ({ data: buffer, width: w, height: h }),
+          putImageData: (img: any) => { buffer.set(img.data); },
+        } as unknown as CanvasRenderingContext2D;
+
+        const fight = createFight('aint_man', 42);
+        fight.player.action = action as any;
+        fight.player.actionFrame = f;
+        renderFrame(mockCtx, fight);
+
+        const frameImg = new Jimp({ width: cellW, height: cellH, data: Buffer.from(buffer) });
+        strip.composite(frameImg, f * cellW, 0);
+      }
+
+      const seqPath = path.join(playerDir, `sequence-${action}.png`);
+      const buffer = await strip.getBuffer('image/png');
+      fs.writeFileSync(seqPath, buffer);
+      expect(fs.existsSync(seqPath)).toBe(true);
+      verifyPngNesPalette(seqPath);
+    });
+  }
 
   // 3. Contact Sheet generation per opponent: screenshots/contact-<opponent_id>.png
   for (const oppId of OPPONENT_IDS) {

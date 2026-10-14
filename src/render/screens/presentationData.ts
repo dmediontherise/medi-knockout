@@ -70,13 +70,18 @@ function isOpaqueChar(ch: string | undefined): boolean {
   return !!ch && ch !== '.' && ch !== ' ';
 }
 
+export const PORTRAIT_VERTICAL_OFFSETS: Record<string, number> = {
+  medi_jinx: 25,
+};
+
 // Build a square portrait crop that shows the character's head and shoulders:
-// - starts at the idle frame's first opaque row
+// - starts at the idle frame's first opaque row (+ optional verticalOffset)
 // - is at least 40% of the idle frame's opaque height (using 45% to capture head & shoulders)
 // - is horizontally centered on the head center (top 25% opaque rows center)
 export function computePortraitCrop(
   sprite: SpriteData,
-  _size?: number
+  _size?: number,
+  verticalOffset: number = 0
 ): { x: number; y: number; w: number; h: number } {
   let firstOpaque = -1;
   let lastOpaque = -1;
@@ -114,10 +119,11 @@ export function computePortraitCrop(
   const cropW = cropH;
 
   let cropX = Math.round(headCenterX - cropW / 2);
-  let cropY = firstOpaque;
+  let cropY = firstOpaque + verticalOffset;
 
   if (cropX < 0) cropX = 0;
   if (cropX + cropW > sprite.width) cropX = Math.max(0, sprite.width - cropW);
+  if (cropY < 0) cropY = 0;
   if (cropY + cropH > sprite.height) cropY = Math.max(0, sprite.height - cropH);
 
   return { x: cropX, y: cropY, w: cropW, h: cropH };
@@ -130,7 +136,8 @@ export function getPortraitCrop(
 ): { x: number; y: number; w: number; h: number } {
   const info = OPPONENT_PRESENTATION[oppId];
   if (!info) return { x: 0, y: 0, w: size || 32, h: size || 32 };
-  return computePortraitCrop(info.sprite, size);
+  const offset = PORTRAIT_VERTICAL_OFFSETS[oppId] ?? 0;
+  return computePortraitCrop(info.sprite, size, offset);
 }
 
 // Wrap text into lines of at most maxChars characters (word boundaries).

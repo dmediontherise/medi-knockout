@@ -79,7 +79,8 @@ function blitSprite(
   sprite: SpriteData,
   destX: number,
   destY: number,
-  overrideColor?: number
+  overrideColor?: number,
+  rowOffsets?: number[]
 ) {
   for (let sy = 0; sy < sprite.height; sy++) {
     const py = destY + sy;
@@ -87,8 +88,10 @@ function blitSprite(
     const row = sprite.rows[sy];
     if (!row) continue;
 
+    const rowOffset = rowOffsets ? (rowOffsets[sy] ?? 0) : 0;
+
     for (let sx = 0; sx < sprite.width; sx++) {
-      const px = destX + sx;
+      const px = destX + sx + rowOffset;
       if (px < 0 || px >= CANVAS_WIDTH) continue;
 
       const char = row[sx];
@@ -255,7 +258,7 @@ export function computeOpponentDraw(
   frame: number = 0,
   hitSide: 'LEFT' | 'RIGHT' = 'RIGHT',
   hitTarget: 'HEAD' | 'BODY' = 'HEAD'
-): { x: number; y: number; sprite: SpriteData; isHidden: boolean; effect: string } {
+): { x: number; y: number; sprite: SpriteData; isHidden: boolean; effect: string; rowOffsets?: number[] } {
   const oppTransform = OPPONENT_POSES[action] || OPPONENT_POSES['IDLE'];
   const oppSprite = getOpponentSprite(opponentId, action, actionFrame, hitSide, hitTarget);
   const anchor = getSpriteAnchor(oppSprite);
@@ -358,7 +361,39 @@ export function computeOpponentDraw(
     }
   }
 
-  return { x, y, sprite: oppSprite, isHidden: isKoHidden, effect };
+  // Visible head snap: on head hit, actionFrame 0-7 (eases to 0 by 10), shear head rows in top 30% of opaque height
+  let rowOffsets: number[] | undefined;
+  if (action === 'HIT' && hitTarget !== 'BODY' && actionFrame <= 10) {
+    const timeFactor = actionFrame <= 7 ? 1.0 : Math.max(0, (10 - actionFrame) / 3);
+    if (timeFactor > 0) {
+      const dir = hitSide === 'LEFT' ? 1 : -1;
+      let firstOpaque = -1;
+      let lastOpaque = -1;
+      for (let r = 0; r < oppSprite.height; r++) {
+        const row = oppSprite.rows[r];
+        if (row && row.split('').some((c) => c !== '.' && c !== ' ')) {
+          if (firstOpaque < 0) firstOpaque = r;
+          lastOpaque = r;
+        }
+      }
+      if (firstOpaque >= 0) {
+        const opaqueH = lastOpaque - firstOpaque + 1;
+        const top30Rows = 0.30 * opaqueH;
+        rowOffsets = [];
+        for (let r = 0; r < oppSprite.height; r++) {
+          if (r >= firstOpaque && r <= firstOpaque + top30Rows) {
+            const rowFrac = (r - firstOpaque) / top30Rows;
+            const falloff = 1 - rowFrac;
+            rowOffsets.push(Math.round(6 * dir * timeFactor * falloff));
+          } else {
+            rowOffsets.push(0);
+          }
+        }
+      }
+    }
+  }
+
+  return { x, y, sprite: oppSprite, isHidden: isKoHidden, effect, rowOffsets };
 }
 
 export function renderFrame(
@@ -414,7 +449,7 @@ export function renderFrame(
       state.opponent.action !== 'KO';
     const oppOverride = (state.opponent.starOpportunity && flash && starFlashActive) ? 0x20 : undefined;
 
-    blitSprite(data, oppDraw.sprite, oppDraw.x + shakeX, oppDraw.y + shakeY, oppOverride);
+    blitSprite(data, oppDraw.sprite, oppDraw.x + shakeX, oppDraw.y + shakeY, oppOverride, oppDraw.rowOffsets);
 
     // Opponent Effect Sprites (spark / stars)
     if (oppDraw.effect === 'spark-head') {

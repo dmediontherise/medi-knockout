@@ -947,5 +947,46 @@ describe('R10 characters and specials preserved', () => {
       }
       expect(landedBody, 'right body punch landed').toBe(true);
     });
+
+    // Task 017 Requirement 6 (M2): landed punchLeftBody must give lastHitSide === 'LEFT', lastHitTarget === 'BODY'
+    it('Task 017 Requirement 6 (M2): landed punchLeftBody gives lastHitSide === LEFT and lastHitTarget === BODY', () => {
+      let fight = createFight('aint_man', 42);
+      fight.phase = 'ROUND_ACTIVE';
+      fight.opponent.action = 'IDLE';
+      fight.opponent.guard = 'HIGH'; // High guard so body punch lands
+
+      let landed = false;
+      for (let i = 0; i < 20; i++) {
+        fight = step(fight, i === 0 ? { punchLeftBody: true } : {});
+        if (fight.opponent.action === 'HIT') {
+          landed = true;
+          expect(fight.opponent.lastHitSide, 'lastHitSide is LEFT for punchLeftBody').toBe('LEFT');
+          expect(fight.opponent.lastHitTarget, 'lastHitTarget is BODY for punchLeftBody').toBe('BODY');
+          break;
+        }
+      }
+      expect(landed, 'punchLeftBody landed').toBe(true);
+    });
+
+    // Task 017 Requirement 6 (M3): landed star punch must give lastHitSide === 'RIGHT', lastHitTarget === 'HEAD'
+    it('Task 017 Requirement 6 (M3): landed starPunch gives lastHitSide === RIGHT and lastHitTarget === HEAD', () => {
+      let fight = createFight('aint_man', 42);
+      fight.phase = 'ROUND_ACTIVE';
+      fight.player.stars = 1;
+      fight.opponent.action = 'IDLE';
+      fight.opponent.guard = 'LOW'; // Low guard so star punch lands
+
+      let landed = false;
+      for (let i = 0; i < 25; i++) {
+        fight = step(fight, i === 0 ? { starPunch: true } : {});
+        if (fight.opponent.action === 'HIT') {
+          landed = true;
+          expect(fight.opponent.lastHitSide, 'lastHitSide is RIGHT for starPunch').toBe('RIGHT');
+          expect(fight.opponent.lastHitTarget, 'lastHitTarget is HEAD for starPunch').toBe('HEAD');
+          break;
+        }
+      }
+      expect(landed, 'starPunch landed').toBe(true);
+    });
   });
 });

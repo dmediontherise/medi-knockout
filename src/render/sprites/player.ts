@@ -64,7 +64,17 @@ export function resolvePlayerFrame(
 
   let frameName = 'IDLE_A';
 
-  if (PLAYER_FRAMES[action]) {
+  const GAMEPLAY_ACTIONS = new Set([
+    'IDLE', 'DUCK', 'BLOCK', 'HIT',
+    'DODGE_LEFT', 'DODGE_RIGHT',
+    'PUNCH_LEFT_HEAD', 'PUNCH_RIGHT_HEAD',
+    'PUNCH_LEFT_BODY', 'PUNCH_RIGHT_BODY',
+    'STAR_PUNCH',
+    'JAB_LEFT', 'JAB_RIGHT', 'HOOK_LEFT', 'HOOK_RIGHT', 'UPPERCUT',
+    'KNOCKED_DOWN', 'KO',
+  ]);
+
+  if (PLAYER_FRAMES[action] && !GAMEPLAY_ACTIONS.has(action)) {
     frameName = action;
   } else if (action === 'KNOCKED_DOWN' || action === 'KO') {
     if (downFighter === 'PLAYER' && playerMashCount >= 1) {
@@ -91,40 +101,50 @@ export function resolvePlayerFrame(
       frameName = idleWindow % 2 === 0 ? 'IDLE_A' : 'IDLE_B';
     }
   } else if (action === 'PUNCH_LEFT_HEAD' || action === 'JAB_LEFT') {
-    if (actionFrame <= 3) {
+    if (actionFrame <= 2) {
       frameName = 'JAB_L_WIND';
+    } else if (actionFrame === 3) {
+      frameName = 'JAB_L_MID';
     } else if (actionFrame <= 8) {
       frameName = 'JAB_L_HIT';
     } else {
       frameName = 'JAB_L_BACK';
     }
   } else if (action === 'PUNCH_RIGHT_HEAD' || action === 'JAB_RIGHT') {
-    if (actionFrame <= 3) {
+    if (actionFrame <= 2) {
       frameName = 'JAB_R_WIND';
+    } else if (actionFrame === 3) {
+      frameName = 'JAB_R_MID';
     } else if (actionFrame <= 8) {
       frameName = 'JAB_R_HIT';
     } else {
       frameName = 'JAB_R_BACK';
     }
   } else if (action === 'PUNCH_LEFT_BODY' || action === 'HOOK_LEFT') {
-    if (actionFrame <= 3) {
+    if (actionFrame <= 2) {
       frameName = 'BODY_L_WIND';
+    } else if (actionFrame === 3) {
+      frameName = 'BODY_L_MID';
     } else if (actionFrame <= 8) {
       frameName = 'BODY_L_HIT';
     } else {
       frameName = 'BODY_L_BACK';
     }
   } else if (action === 'PUNCH_RIGHT_BODY' || action === 'HOOK_RIGHT') {
-    if (actionFrame <= 3) {
+    if (actionFrame <= 2) {
       frameName = 'BODY_R_WIND';
+    } else if (actionFrame === 3) {
+      frameName = 'BODY_R_MID';
     } else if (actionFrame <= 8) {
       frameName = 'BODY_R_HIT';
     } else {
       frameName = 'BODY_R_BACK';
     }
   } else if (action === 'STAR_PUNCH' || action === 'UPPERCUT') {
-    if (actionFrame <= 7) {
+    if (actionFrame <= 6) {
       frameName = 'STAR_WIND';
+    } else if (actionFrame === 7) {
+      frameName = 'STAR_MID';
     } else if (actionFrame <= 15) {
       frameName = 'STAR_HIT';
     } else {
@@ -143,11 +163,23 @@ export function resolvePlayerFrame(
       frameName = 'DODGE_R';
     }
   } else if (action === 'DUCK') {
-    frameName = 'DUCK';
+    if (actionFrame <= 2 || actionFrame >= 17) {
+      frameName = 'DUCK_HALF';
+    } else {
+      frameName = 'DUCK';
+    }
   } else if (action === 'BLOCK') {
-    frameName = 'BLOCK';
+    if (actionFrame <= 2) {
+      frameName = 'BLOCK_HALF';
+    } else {
+      frameName = 'BLOCK';
+    }
   } else if (action === 'HIT') {
-    frameName = 'HIT';
+    if (actionFrame >= 10) {
+      frameName = 'HIT_BACK';
+    } else {
+      frameName = 'HIT';
+    }
   } else {
     // Default fallback
     frameName = 'IDLE_A';
